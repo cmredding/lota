@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Legacy of the Ancients — Reconstructed</title>
+<style>
+  :root{
+    --bg:#070912; --panel:#0e1426; --panel2:#141d36; --ink:#e8edff;
+    --gold:#f4c860; --gold2:#b8893a; --accent:#5cc6ff; --good:#7ee08a;
+    --bad:#ff6b6b; --dim:#8a93b8; --line:#27314f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden;}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+  #stage{position:relative;width:min(100vw,calc(100vh*1.5));height:min(100vh,calc(100vw/1.5));
+    background:#000;box-shadow:0 0 60px #000 inset, 0 0 80px rgba(0,0,0,.8);}
+  canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:block;}
+  /* UI overlays */
+  .layer{position:absolute;inset:0;pointer-events:none;}
+  .panel{position:absolute;background:linear-gradient(180deg,var(--panel2),var(--panel));
+    border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.6);
+    pointer-events:auto;}
+  .gold{color:var(--gold)}
+  .btn{display:inline-block;cursor:pointer;border:1px solid var(--gold2);
+    background:linear-gradient(180deg,#1b2b4a,#10182c);color:var(--gold);
+    padding:.55em 1.1em;border-radius:8px;font-weight:600;letter-spacing:.03em;
+    transition:.12s;user-select:none;}
+  .btn:hover{background:var(--gold);color:#1a1205;border-color:var(--gold);}
+  /* Dialogue box */
+  #dlg{left:4%;right:4%;bottom:4%;min-height:22%;padding:18px 22px;display:none;
+    font-size:clamp(13px,2.1vh,20px);line-height:1.5;}
+  #dlg .who{color:var(--gold);font-weight:700;letter-spacing:.04em;margin-bottom:6px;
+    text-transform:uppercase;font-size:.8em;}
+  #dlg .txt{min-height:3em;}
+  #dlg .cont{position:absolute;right:18px;bottom:10px;color:var(--accent);font-size:.7em;
+    animation:blink 1s steps(2) infinite;}
+  @keyframes blink{50%{opacity:.2}}
+  /* HUD */
+  #hud{left:0;right:0;top:0;height:auto;display:none;}
+  .hudbar{display:flex;gap:14px;padding:8px 14px;align-items:center;
+    background:linear-gradient(180deg,rgba(8,12,24,.92),rgba(8,12,24,.0));font-size:clamp(11px,1.7vh,15px);}
+  .stat{display:flex;align-items:center;gap:5px;font-variant-numeric:tabular-nums;}
+  .stat b{color:var(--gold);font-weight:700}
+  .bar{width:90px;height:9px;background:#2a1414;border:1px solid #51202a;border-radius:5px;overflow:hidden}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,#ff5a5a,#ff8a5a);}
+  .loc{margin-left:auto;color:var(--accent);font-weight:600;letter-spacing:.05em}
+  /* Menu / lists */
+  #menu{display:none;left:50%;top:50%;transform:translate(-50%,-50%);width:min(78%,640px);
+    padding:22px 26px;font-size:clamp(13px,2vh,18px);max-height:86%;overflow:auto;}
+  #menu h2{margin:.1em 0 .5em;color:var(--gold);font-weight:800;letter-spacing:.04em;}
+  .row{display:flex;justify-content:space-between;padding:9px 12px;border:1px solid var(--line);
+    border-radius:8px;margin:6px 0;cursor:pointer;background:rgba(255,255,255,.02);transition:.1s}
+  .row:hover{background:rgba(244,200,96,.12);border-color:var(--gold2)}
+  .row .sub{color:var(--dim);font-size:.82em}
+  .closerow{text-align:center;color:var(--dim);margin-top:10px;cursor:pointer}
+  .closerow:hover{color:var(--ink)}
+  /* Title */
+  #title{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;pointer-events:auto;}
+  #title h1{font-size:clamp(26px,7vh,68px);margin:0;letter-spacing:.06em;font-weight:800;
+    color:var(--gold);text-shadow:0 0 24px rgba(244,200,96,.45),0 3px 0 #000;line-height:1;}
+  #title .sub{color:var(--accent);letter-spacing:.42em;margin:10px 0 4px;font-size:clamp(10px,2vh,16px);text-transform:uppercase}
+  #title .tag{color:var(--dim);max-width:60%;font-size:clamp(11px,1.8vh,15px);margin-top:18px;line-height:1.5}
+  #title .menu{margin-top:34px;display:flex;flex-direction:column;gap:12px}
+  .toast{position:absolute;left:50%;top:14%;transform:translateX(-50%);background:rgba(10,14,28,.95);
+    border:1px solid var(--gold2);color:var(--gold);padding:8px 18px;border-radius:20px;
+    font-size:clamp(12px,1.8vh,15px);pointer-events:none;opacity:0;transition:.3s;font-weight:600}
+  .toast.show{opacity:1}
+  .center-hint{position:absolute;left:0;right:0;bottom:2.5%;text-align:center;color:var(--dim);
+    font-size:clamp(10px,1.5vh,13px);pointer-events:none}
+  .fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .35s;}
+  .vignette{position:absolute;inset:0;pointer-events:none;
+    box-shadow:0 0 140px rgba(0,0,0,.7) inset;}
+  kbd{background:#1b2440;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;
+    padding:1px 6px;font-size:.85em;color:var(--ink)}
+  /* Touch controls */
+  #touch{z-index:50;}
+  #touch .tb{pointer-events:auto;user-select:none;-webkit-user-select:none;touch-action:none;
+    display:flex;align-items:center;justify-content:center;color:var(--ink);
+    background:linear-gradient(180deg,rgba(40,52,86,.82),rgba(16,24,44,.82));
+    border:1px solid var(--line);border-radius:12px;font-size:clamp(18px,3.4vh,26px);
+    box-shadow:0 3px 10px rgba(0,0,0,.5);backdrop-filter:blur(2px);}
+  #touch .tb.act{background:var(--gold);color:#1a1205;border-color:var(--gold);transform:scale(.94);}
+  .dpad{position:absolute;left:max(12px,2.5%);bottom:max(14px,3%);
+    display:grid;grid-template-columns:repeat(3,clamp(44px,9vh,62px));
+    grid-template-rows:repeat(3,clamp(44px,9vh,62px));gap:6px;
+    grid-template-areas:". up ." "left mid right" ". down .";opacity:.9;}
+  .tb-up{grid-area:up}.tb-down{grid-area:down}.tb-left{grid-area:left}.tb-right{grid-area:right}
+  .tb-mid{grid-area:mid;background:transparent!important;border:none!important;box-shadow:none!important;pointer-events:none!important;}
+  .acts{position:absolute;right:max(12px,2.5%);bottom:max(14px,3%);display:flex;flex-direction:column;
+    align-items:flex-end;gap:10px;opacity:.92;}
+  .abrow{display:flex;gap:12px;align-items:center;}
+  .btnA{width:clamp(62px,12vh,84px);height:clamp(62px,12vh,84px);border-radius:50%!important;
+    font-weight:800;color:var(--gold)!important;border-color:var(--gold2)!important;font-size:clamp(20px,3.6vh,28px)!important;}
+  .btnB{width:clamp(48px,9vh,64px);height:clamp(48px,9vh,64px);border-radius:50%!important;color:var(--dim)!important;}
+  .minirow{display:flex;gap:8px;}
+  .mini{width:clamp(40px,7.5vh,52px);height:clamp(40px,7.5vh,52px);font-size:clamp(15px,2.6vh,20px)!important;border-radius:10px;}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="cv" width="480" height="320"></canvas>
+  <div class="vignette"></div>
+
+  <!-- HUD -->
+  <div class="layer" id="hud"><div class="hudbar">
+    <div class="stat">❤ <div class="bar"><i id="hpfill"></i></div><span id="hptxt"></span></div>
+    <div class="stat">⚔ Lv<b id="lvl">1</b></div>
+    <div class="stat">⭐<b id="xp">0</b></div>
+    <div class="stat">💰<b id="gold">0</b></div>
+    <div class="stat">🜚<b id="coins">0</b><span class="sub" style="color:var(--dim);font-size:.8em">coins</span></div>
+    <div class="loc" id="loc">Tarmalon</div>
+    <div class="stat" id="savebtn" title="Save game" style="cursor:pointer;font-size:1.05em;color:var(--good)">💾</div>
+    <div class="stat" id="loadbtn" title="Load game" style="cursor:pointer;font-size:1.05em;color:var(--accent)">📂</div>
+    <div class="stat" id="sysbtn" title="System menu (Esc)" style="cursor:pointer;font-size:1.05em;color:var(--dim)">⚙</div>
+    <div class="stat" id="musbtn" title="Toggle music (P)" style="cursor:pointer;font-size:1.2em;color:var(--gold)">♪</div>
+  </div></div>
+  <input type="file" id="fileimport" accept="application/json,.json" style="display:none">
+
+
+  <!-- Dialogue -->
+  <div class="panel" id="dlg">
+    <div class="who" id="dwho"></div>
+    <div class="txt" id="dtxt"></div>
+    <div class="cont" id="dcont">▼ space</div>
+  </div>
+
+  <!-- Generic menu -->
+  <div class="panel" id="menu"></div>
+
+  <!-- Title -->
+  <div id="title" class="layer">
+    <div class="sub">A Galactic Museum Adventure</div>
+    <h1>LEGACY OF<br>THE ANCIENTS</h1>
+    <div class="sub" style="letter-spacing:.2em;color:var(--dim)">Planet Tarmalon · Reconstructed Edition</div>
+    <div class="tag" id="titletag"></div>
+    <div class="menu">
+      <div class="btn" id="btnNew">Begin the Quest</div>
+      <div class="btn" id="btnContinue" style="display:none">Continue</div>
+      <div class="btn" id="btnImport" style="font-size:.85em;border-color:var(--line);background:#10182c;color:var(--dim)">Load save file…</div>
+      <div class="btn" id="btnAbout" style="font-size:.85em;border-color:var(--line);background:#10182c;color:var(--dim)">About this reconstruction</div>
+    </div>
+  </div>
+
+  <!-- Touch controls (mobile) -->
+  <div id="touch" class="layer" style="display:none">
+    <div class="dpad">
+      <div class="tb tb-up" data-k="ArrowUp">▲</div>
+      <div class="tb tb-left" data-k="ArrowLeft">◀</div>
+      <div class="tb tb-mid"></div>
+      <div class="tb tb-right" data-k="ArrowRight">▶</div>
+      <div class="tb tb-down" data-k="ArrowDown">▼</div>
+    </div>
+    <div class="acts">
+      <div class="minirow">
+        <div class="tb mini" data-k="i" title="Inventory">🎒</div>
+        <div class="tb mini" data-k="m" title="Quest">📜</div>
+        <div class="tb mini" data-k="Escape" title="Menu / Back">⚙</div>
+      </div>
+      <div class="abrow">
+        <div class="tb btnB" data-k="Escape">B</div>
+        <div class="tb btnA" data-k=" ">A</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="center-hint" id="chint"></div>
+  <div class="fade" id="fade"></div>
+</div></div>
+
+<script>
+/* ============================================================
+   LEGACY OF THE ANCIENTS — modern reconstruction
+   Content (museum exhibits, town hints, map grids) decoded from
+   the original 1987 EA DOS files via the dos-decode-kit method.
+   ============================================================ */
+const CONTENT = {"museum": ["Eons ago, nomadic warriors roamed the planet Tarmalon. They hunted and fought with stone knives, much like the one you see in this exhibit. This knife is primitive - but effective. As a Museum patron, you may take it for as long as you like. The knife is now in your inventory.", "As Tarmalon culture advanced, weapons developed a ceremonial importance. In this exhibit you see the famed staff of sacrifice. It was used to coronate kings. Although intended for ceremony, the staff is actually bladed for combat. As a Museum patron, you may use this weapon for as long as you like. It is now in your possession.", "This exhibit shows a typical Tarmalon town called Thornberry. The town was established over 100 lifespans ago by a group of wealthy merchants. Thornberry has changed little since its founding. The rich and the poor still live on opposite sides of town separated by a massive stone wall. Despite its inequity, Thornberry is a bustling community, containing shops, craftsmen, banks, and places of amusement.", "Here's some gold to spend on your trip. armalon's deep ocean waters are so turbulent that few trading ships ever venture far from shore. Yet, long ago, the oceans were calm and ocean travel flourished. As time went by, pirates came to rule the seas. They preyed on helpless vessels, taking gold, weapons, armor and supplies. Their treasures were stored in deep caves on remote islands. This booty was guarded by paid soldiers and by animals bred for their ferocity. When the oceans became rougher, many of the caves could no longer be reached. In this exhibit, you see the entrance to one such cave. The wealth stored within is enormous.", "The pirate's lair is located in a chain of islands called the \"Three Sisters.\" You will be transported to the largest island. From there, you're on your own. The pirate's lair has many levels. At the very bottom, it is said, lies a priceless SAPPHIRE!", "Planet natives believe in the curative power of a variety of \"healing herbs.\" However, the effectiveness of these plants has never been verified by Museum personnel. This display contains a Juton bush. According to lore, its fruit increases the power of other native herbs. While this claim is doubtful, the fruit is really quite tasty. You may sample one.", "Here you see a replica of the famous enchanted Flower Fountain. Legend says that its waters once flowed in splendor. One day a tulip was taken from the Fountain gardens and the Fountain waters stopped. The stories say that only when that flower is returned will the fountain flow again. Myth or fact? Judge for yourself. In either case, the Museum has agreed to help search for the Tulip.", "Bring the Tulip back here for a nice reward. Meanwhile, here's some native gold to aid you in your search. hank you for returning the Tulip! As a reward, Charm: +10 ifferent planets have different treasures. On Tarmalon, as on many planets, the scarcity of GOLD makes it exceedingly valuable. Here you see the Museum currency room. It contains a small (but noteworthy) portion of the planet's wealth. You are welcome to a sample.", "Stones of Wisdom is probably the most popular bar-room game on Tarmalon. It is not only fun, but said to help develop a player's intelligence.", "This giant tapestry is actually a map of the planet Tarmalon. It's the only remaining world map made by Tarmalon natives. This Museum is located in the north- east portion of the main continent. Baron Kelfor's castle is on an island in the major inland lake. Near the bottom left of the tapestry, you can see the chain of islands called the \"THREE SISTERS.\" A large pirate's lair is said to be on one of these islands.", "The underground catacombs of Armak are infamous for their twisting passageways and deadly monsters. To venture there, it is said, is almost certain death. Yet, for many years, the rulers of Tarmalon have cast their best knights into these dungeon depths. Only a few ever make it back to the surface. Those who survive become tougher, fiercer, and wiser. They emerge virtually unbeatable in battle. You now face the same test, for in a moment, you'll find yourself at the very bottom of Armak. the way out lies far above. The risk is great - the PAYOFF is GREATER!!", "As you well know, some exhibits in this museum can be deadly, but you haven't even seen the most dangerous displays. Many years ago, the innermost section of this museum was blocked off. Some exhibits found there were just too dangerous. Museum insurance rates were skyrocketing! Since you have succeeded where many others have failed, this part of the Museum will be open to you from now on. Perhaps you have a chance. Probably, you don't.", "Legends say that 13 great wizards once ruled Tarmalon, but that little of their power remains. Those who escaped death and treachery ultimately succumbed to the ravages of time. The wax figure before you is the Wizard of Arovyn. His power largely gone, he is said to be imprisoned deep within Kelfor castle. Only the pass- word 'guardians' will open his door.", "This exhibit shows the gateway to Tarmalon's most dangerous dungeon. It is largely this exhibit which caused the inner section of the Museum to be closed off to casual explorers. The Museum has not charted this dungeon, and has little knowledge of its contents. We know primarily that nobody has yet emerged alive.", "This magnificent beast was found frozen to a high cliff near the Museum. Locals say that PEGASUS stood alert for over a lifespan - poised as if ready to fly. Finally, the magical animal succumbed to the bitter cold.", "Suddenly, the ice covering PEGASUS cracks apart! The winged horse looks at you with probing eyes, and then lowers one wing, as if asking you to climb on.", "Welcome, noble traveler, to this Galactic Museum on the planet of Tarmalon. The Museum provides views and gateways to many fascinating aspects of planetary life. Use standard coins to view exhibits. Please do not give away coins, or feed the Tarmalon natives. Have a nice day!", "Your gold bracelet glows. A strange voice sounds inside your head... Do not be alarmed. You are just hearing my thoughts, as recorded by the bracelet. Since you are now wearing my bracelet, I must be dead. I therefore charge you to continue my mission: to neutralize the evil Scroll of Spells before it destroys everything! You see, the leather Scroll you now carry is the immensely evil Wizards' Compendium. Since it cannot be destroyed outright, you must learn how to render its magic harmless. BEWARE! There are those who would think nothing of killing you in order to possess the magic Compendium. There is little more to tell. By now, you must be inside the Galactic Museum, your entrance gained by the bracelet and my obsidian code-disk. This museum was built by a race of ancient beings, who constructed many such museums on many different planets. These \"ANCIENTS\" designed each museum for their own amusement. If you're clever, you'll find many answers here. Yet, since you're not one of the ancients, you'll have to scrounge around the countryside for coins to view exhibits. REMEMBER YOUR QUEST. Good luck.", "\"WELCOME TO OUR MUSEUM! I am the Museum Caretaker. Although my influence outside this museum is limited, I'll provide you with help and information whenever I can. \"Right now, you should explore the world around you. Feel free to use the Museum exhibits or, if you'd rather, use the doors to go directly outside.\"", "\"Perhaps you are now strong enough to help me. Long ago, two priceless specimens were stolen from the Museum: The jewelled Crown and Scepter of MANCELLA.\" \"Although Museum policy will not let me recover them, perhaps you would like to try. I don't know where the Crown and Scepter are, but I have a key which should help you.\" \"Naturally, there's a reward.\"", "\"Congratulations on finding the Scepter! While you were away, I discovered one more thing about the Crown. It is stored far away from the castle, deep underground.\"", "\"I'm glad you've found the Crown! I've discovered one more thing about the Scepter. It is hidden somewhere on this continent.\"", "\"THE SCEPTER AND CROWN! This is truly a great day for the Tarmalon Museum. I want you to have this MAGIC ICE. It may help you someday. It works best inside.\"", "\"I have disturbing news. A merchant in Big Rapids has been killed by marauders from across the sea.\"", "\"Laingsburg is under attack. Rumor has it that the Wizards' Compendium is behind it all.\"", "\"The healer in Holy Point is now missing. I fear that the entire planet is in great danger. If you don't recover the Compendium soon, all will be lost.\"", "\"I've heard that your magic Scroll was stolen. My sources say that it was sold a few days later on the black market.\"", "\"Your stolen Scroll must be important! I hear that it has been sold to a powerful and cruel warlord. You will need to gain strength and wisdom before you can recover the Scroll.\"", "\"The evil warlord is apparently using the Wizards' Compendium to create powerful spells of destruction.\" \"The warlord lives in a fortress far across the sea. It is said to be very difficult to reach.\"", "\"You must do more before I can help you again. You may use the Museum exhibits or explore the lands outside.\"", "\"Thank you and good luck. Here is the key. If you find the Scepter and Crown, please bring them back to this exhibit.\"", "\"You have shown bravery against all odds. You have revealed selfless dedication in the face of adversity. By my power as Caretaker, I award thee the Galactic Medal of Honor!!!\"", "\"This medallion, the Museum's highest honor, has been awarded to only a handful of explorers across the galaxy. Wear it with Pride!! \"and now, allow me to present our newest display...\" his Wizards' Compendium was crafted by Tarmalon wizards millenia ago. It has just returned to exhibit, after mysteriously disappearing several years ago. During its absence, this Scroll was used to cast evil and powerful spells. The Scroll was recovered, and is now confined to this exhibit by four special guard jewels. Until now, this museum has considered all magic a hoax, but the leather Scroll's abilities are stunning, proving the power of Tarmalon magic.", "THE WIZARDS' COMPENDIUM! Tarmalon is saved! \"Never again will my people ignore the power of this evil device. With the help of the four magic jewels, it will be guarded night and day.\" \"You have succeeded against all odds. How one person came to possess such strength, courage, and wisdom, I shall never know. Tarmalon is forever in your debt.\"", "\"Please look at the Ancient Artifact exhibit and then return here!\""], "hints": ["Buyback shops pay nicely once you learn to negotiate.", "I see you playing flip-flop and winning a fortune!", "The lender will give you money at good rates.", "Healers can help you after you find the Juton bush.", "Carry gold - merchants might sell you museum coins.", "Carry climbing gear. It will prove handy.", "The path to greatness lies through the museum.", "The warlord's agents are everywhere. Watch out!", "Learn to lie - so you'll master the Stones of Wisdom.", "The pirate's cave is west of Eagle Hollow.", "Only the 4 jewels can thwart the evil compendium.", "You need herbs to succeed in dungeons.", "It works best to club the slash nettle to death.", "Keep money in the bank in case of death.", "Castle doors require four different keys.", "Visit ALL the museum displays. They will help more than you know.", "Behind the castle gardens lies a special flower.", "In the right places, magic seeds make you invisible.", "Hidden passageways line the castle! LOOK CAREFULLY!!!", "Many guards protect the mints. It's worth the fight.", "An evil warlord's man was here asking about you.", "Healers are more than they seem. Bide your time.", "The Maston Leaper fears only a bladed staff.", "You must master the spiral room.", "Use the bladed staff to neutralize the Neural Cloud.", "Go back to school. You can learn more.", "Speak to the temptress in the castle.", "The castle wizards know many answers.", "There's a path around the castle gas trap.", "You can't climb up the knight's dungeon. STAY AWAY!", "You can flail the sea swallow to death.", "Have you visited each museum display?", "Watch out. The agents may be after you.", "One day you will travel high above the sea.", "Talk to the guardians of the scroll.", "Learn the password to the castle wizard's quarters.", "You can trust the winged horse. ."], "castle_grid": [[45, 42, 42, 42, 42, 42, 42, 42, 42, 42, 1, 1, 1, 1, 1, 1, 1, 1, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 46, 45, 42, 42, 42, 42, 46, 45, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 1, 1, 1, 1, 1, 1, 43, 45, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 46], [44, 3, 3, 3, 3, 3, 3, 3, 129, 180, 130, 119, 118, 116, 119, 119, 120, 120, 121, 2, 2, 2, 2, 2, 2, 2, 2, 2, 128, 128, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 43, 44, 227, 227, 227, 227, 43, 44, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 180, 128, 124, 117, 119, 116, 118, 116, 120, 43, 44, 148, 149, 148, 148, 151, 149, 150, 150, 151, 150, 150, 149, 150, 148, 151, 148, 43], [44, 3, 3, 3, 3, 3, 3, 3, 3, 129, 128, 130, 119, 116, 119, 119, 119, 120, 119, 121, 2, 2, 2, 2, 2, 2, 2, 2, 180, 128, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 51, 52, 227, 227, 227, 227, 51, 52, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 180, 128, 124, 118, 117, 120, 120, 117, 119, 117, 43, 44, 148, 149, 112, 109, 109, 109, 109, 109, 109, 109, 109, 109, 109, 113, 109, 109, 43], [44, 3, 3, 3, 3, 3, 3, 3, 3, 3, 129, 128, 130, 119, 120, 120, 117, 116, 118, 119, 118, 121, 2, 2, 2, 2, 2, 2, 180, 180, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 180, 128, 180, 128, 124, 116, 120, 119, 116, 120, 116, 118, 119, 43, 44, 150, 151, 107, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 111, 118, 117, 43], [44, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 129, 128, 130, 118, 116, 119, 119, 118, 118, 117, 118, 118, 118, 119, 117, 117, 120, 125, 128, 126, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 7, 7, 7, 180, 180, 180, 128, 124, 119, 118, 118, 119, 120, 118, 119, 118, 119, 118, 43, 44, 148, 151, 107, 6, 219, 6, 223, 153, 154, 155, 6, 6, 6, 111, 116, 118, 43], [44, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 129, 180, 130, 117, 116, 117, 116, 116, 120, 116, 120, 118, 116, 118, 116, 120, 120, 125, 128, 126, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7, 7, 7, 180, 128, 124, 118, 116, 120, 120, 118, 116, 118, 120, 120, 118, 117, 119, 118, 43, 44, 151, 151, 107, 6, 6, 6, 6, 158, 157, 156, 6, 6, 6, 111, 118, 119, 43], [44, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 129, 128, 130, 116, 118, 119, 116, 116, 119, 119, 116, 120, 119, 120, 116, 116, 118, 125, 180, 126, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 7, 7, 7, 7, 7, 180, 128, 128, 124, 120, 118, 117, 119, 118, 119, 120, 116, 120, 116, 116, 49, 41, 41, 48, 44, 150, 150, 107, 6, 219, 6, 219, 6, 6, 6, 6, 6, 6, 111, 119, 118, 43], [44, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 129, 180, 130, 120, 118, 117, 120, 118, 118, 120, 118, 116, 119, 119, 119, 117, 116, 125, 128, 180, 128, 180, 128, 180, 128, 128, 128, 228, 228, 228, 228, 228, 228, 228, 228, 180, 128, 128, 128, 124, 117, 117, 118, 116, 120, 118, 116, 120, 120, 120, 117, 117, 120, 117, 43, 40, 40, 40, 44, 148, 148, 107, 6, 6, 104, 105, 105, 105, 105, 105, 105, 105, 115, 119, 120, 43], [44, 2, 2, 2, 62, 54, 54, 54, 54, 63, 3, 3, 3, 3, 3, 129, 128, 128, 180, 180, 180, 128, 180, 130, 116, 117, 118, 118, 120, 119, 116, 116, 117, 116, 120, 119, 117, 117, 118, 116, 119, 119, 119, 119, 118, 117, 118, 119, 116, 120, 118, 116, 120, 117, 118, 116, 120, 116, 117, 116, 119, 118, 120, 116, 119, 116, 116, 117, 43, 40, 40, 40, 44, 150, 149, 107, 6, 219, 111, 116, 118, 119, 117, 117, 116, 116, 117, 118, 117, 43], [44, 2, 2, 2, 56, 53, 53, 53, 53, 57, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 129, 180, 130, 117, 120, 117, 119, 118, 118, 119, 117, 118, 120, 118, 118, 119, 117, 120, 118, 120, 117, 116, 118, 116, 120, 118, 119, 119, 120, 117, 118, 117, 116, 116, 117, 119, 120, 117, 118, 118, 120, 118, 120, 117, 117, 116, 43, 40, 40, 40, 44, 148, 151, 107, 6, 6, 111, 118, 120, 120, 120, 118, 117, 119, 120, 119, 117, 43], [44, 2, 2, 2, 56, 53, 53, 53, 53, 57, 205, 3, 205, 3, 205, 3, 3, 3, 3, 3, 3, 3, 3, 129, 180, 130, 117, 118, 119, 119, 116, 117, 116, 117, 116, 116, 120, 119, 117, 117, 117, 116, 118, 120, 117, 120, 117, 119, 118, 116, 117, 117, 120, 118, 120, 116, 117, 120, 119, 119, 49, 41, 41, 41, 41, 41, 41, 41, 48, 40, 40, 40, 47, 41, 41, 41, 248, 248, 41, 41, 31, 32, 32, 32, 32, 32, 32, 32, 32, 33], [44, 2, 2, 2, 56, 53, 58, 55, 55, 65, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 129, 180, 130, 116, 120, 117, 117, 120, 118, 118, 118, 118, 120, 118, 117, 118, 116, 119, 116, 120, 119, 119, 116, 119, 118, 119, 118, 119, 116, 118, 116, 118, 120, 116, 117, 120, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 245, 245, 40, 40, 44, 6, 6, 6, 6, 6, 6, 6, 6, 43], [44, 2, 2, 2, 56, 53, 57, 3, 3, 3, 205, 3, 205, 3, 205, 3, 205, 3, 3, 3, 3, 3, 3, 3, 3, 129, 180, 128, 180, 128, 128, 180, 180, 180, 128, 128, 128, 180, 128, 180, 180, 228, 228, 228, 228, 228, 228, 228, 228, 49, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 48, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 245, 245, 245, 40, 40, 44, 153, 154, 155, 221, 6, 6, 6, 6, 43], [44, 2, 2, 2, 56, 53, 57, 153, 154, 155, 207, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 8, 8, 8, 8, 8, 8, 8, 8, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 245, 245, 245, 40, 40, 44, 158, 157, 156, 221, 6, 6, 6, 6, 43], [44, 2, 2, 2, 56, 53, 57, 158, 157, 156, 3, 3, 205, 3, 205, 3, 205, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 8, 8, 8, 8, 8, 8, 8, 8, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 245, 245, 40, 40, 40, 44, 6, 222, 219, 219, 6, 6, 6, 6, 43], [44, 2, 2, 2, 56, 53, 60, 54, 54, 54, 54, 54, 54, 54, 54, 54, 63, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 8, 8, 8, 8, 8, 8, 8, 8, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 40, 40, 40, 44, 6, 6, 6, 6, 6, 6, 6, 6, 43], [44, 2, 2, 2, 56, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 60, 54, 54, 54, 54, 54, 54, 54, 63, 41, 41, 41, 41, 41, 50, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 8, 8, 8, 8, 8, 8, 8, 8, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 40, 40, 40, 44, 6, 6, 6, 6, 6, 6, 6, 6, 43], [44, 2, 2, 2, 56, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 57, 40, 40, 40, 40, 40, 44, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 8, 8, 8, 8, 8, 8, 8, 8, 43, 40, 40, 40, 40, 104, 105, 105, 105, 105, 105, 106, 42, 42, 42, 42, 42, 246, 246, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 52, 105, 105, 105, 105, 105, 106, 6, 6, 43], [44, 2, 2, 2, 56, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 57, 40, 40, 40, 40, 40, 47, 41, 41, 41, 41, 41, 41, 41, 41, 41, 50, 8, 8, 8, 8, 8, 8, 8, 8, 43, 40, 40, 40, 40, 111, 148, 152, 152, 148, 148, 152, 149, 150, 149, 151, 107, 6, 6, 111, 150, 148, 148, 150, 150, 149, 151, 150, 151, 150, 149, 152, 149, 149, 151, 152, 150, 107, 6, 6, 43], [44, 2, 2, 2, 56, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 57, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 44, 8, 8, 8, 8, 8, 8, 8, 8, 43, 40, 40, 40, 40, 111, 149, 152, 148, 148, 148, 151, 149, 152, 148, 149, 107, 6, 6, 111, 152, 152, 148, 150, 151, 149, 152, 150, 148, 152, 152, 151, 148, 151, 148, 150, 150, 107, 6, 6, 43], [44, 2, 2, 2, 56, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 57, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 45, 42, 42, 46, 40, 44, 8, 8, 8, 8, 8, 8, 8, 8, 43, 40, 45, 42, 42, 110, 109, 109, 109, 109, 109, 109, 109, 109, 109, 109, 108, 6, 6, 110, 109, 109, 109, 109, 109, 109, 109, 109, 109, 109, 109, 109, 109, 109, 109, 109, 109, 108, 6, 6, 43], [44, 2, 2, 2, 56, 53, 58, 55, 55, 55, 55, 55, 55, 55, 55, 59, 53, 53, 53, 53, 53, 53, 53, 53, 57, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 44, 6, 6, 51, 42, 52, 8, 8, 8, 8, 8, 8, 8, 8, 51, 42, 52, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43], [44, 2, 2, 2, 56, 53, 44, 12, 10, 11, 12, 10, 11, 12, 10, 56, 53, 53, 53, 53, 53, 53, 53, 53, 57, 42, 42, 42, 42, 42, 42, 46, 40, 40, 40, 44, 6, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43], [44, 2, 2, 2, 56, 53, 44, 11, 12, 10, 11, 12, 131, 132, 12, 56, 53, 53, 53, 53, 53, 53, 53, 53, 57, 6, 6, 223, 153, 154, 155, 43, 40, 40, 40, 44, 6, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43], [44, 2, 192, 2, 56, 53, 44, 10, 11, 12, 10, 11, 133, 134, 11, 64, 59, 53, 53, 53, 53, 53, 53, 53, 57, 6, 219, 223, 158, 157, 156, 43, 40, 40, 40, 47, 50, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43], [44, 165, 166, 165, 56, 53, 44, 93, 93, 93, 93, 93, 93, 93, 93, 93, 56, 53, 53, 53, 53, 53, 53, 53, 57, 6, 6, 219, 49, 41, 41, 48, 40, 40, 40, 40, 44, 6, 6, 6, 6, 229, 229, 229, 229, 229, 229, 229, 229, 6, 6, 6, 6, 6, 49, 41, 41, 41, 41, 41, 41, 41, 41, 50, 6, 6, 6, 6, 6, 6, 104, 105, 105, 105, 105, 105, 105, 105, 105, 105, 105, 105, 105, 105, 105, 105, 105, 105, 106, 43], [44, 2, 2, 2, 56, 53, 44, 97, 97, 97, 97, 97, 97, 97, 97, 97, 56, 53, 53, 53, 53, 53, 53, 53, 57, 6, 219, 6, 51, 42, 42, 42, 42, 42, 42, 42, 52, 6, 6, 6, 229, 8, 8, 8, 8, 8, 8, 8, 8, 229, 6, 6, 6, 6, 43, 40, 40, 45, 42, 42, 42, 46, 40, 44, 6, 6, 6, 6, 6, 6, 111, 150, 149, 151, 151, 148, 150, 150, 151, 149, 148, 152, 148, 150, 152, 150, 151, 151, 107, 43], [44, 2, 2, 2, 56, 53, 44, 211, 2, 211, 2, 211, 2, 211, 2, 211, 56, 53, 53, 53, 53, 53, 53, 53, 57, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 229, 8, 104, 105, 105, 105, 105, 105, 105, 106, 8, 229, 6, 6, 6, 43, 40, 40, 44, 153, 154, 155, 43, 40, 44, 6, 6, 6, 6, 6, 6, 111, 150, 151, 149, 152, 151, 152, 152, 150, 148, 152, 149, 152, 152, 151, 150, 149, 149, 107, 43], [44, 2, 2, 2, 56, 53, 44, 2, 3, 2, 3, 2, 3, 2, 3, 2, 64, 55, 55, 55, 55, 55, 55, 55, 65, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 229, 8, 111, 116, 118, 118, 118, 120, 116, 107, 8, 229, 6, 6, 6, 43, 40, 40, 44, 158, 157, 156, 51, 42, 52, 6, 6, 6, 6, 6, 6, 49, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 48], [44, 2, 2, 2, 56, 53, 44, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 169, 193, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 229, 8, 111, 117, 116, 119, 119, 120, 118, 107, 8, 229, 6, 6, 6, 43, 40, 40, 44, 6, 222, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40], [44, 2, 2, 2, 56, 53, 44, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 170, 193, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 229, 8, 111, 117, 119, 120, 119, 120, 117, 107, 8, 229, 6, 6, 6, 43, 40, 40, 44, 6, 219, 6, 219, 6, 219, 6, 6, 6, 6, 6, 6, 43, 40, 40, 40, 40, 40, 40, 40, 45, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 46], [44, 2, 2, 2, 56, 53, 44, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 169, 193, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 229, 8, 111, 120, 118, 117, 120, 117, 117, 107, 8, 229, 6, 6, 6, 43, 40, 40, 44, 6, 219, 6, 6, 6, 6, 6, 6, 6, 6, 49, 41, 48, 40, 40, 40, 40, 40, 40, 40, 44, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43], [44, 2, 2, 2, 56, 53, 60, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 50, 6, 6, 229, 8, 110, 109, 109, 109, 109, 109, 109, 108, 8, 229, 6, 6, 6, 43, 40, 40, 44, 6, 6, 6, 49, 41, 50, 6, 6, 6, 6, 51, 42, 42, 42, 46, 40, 40, 40, 40, 40, 44, 6, 6, 224, 224, 224, 224, 224, 224, 6, 6, 43], [44, 2, 2, 2, 56, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 40, 40, 45, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 46, 40, 44, 6, 6, 6, 229, 8, 8, 8, 8, 8, 8, 8, 8, 229, 6, 6, 6, 6, 43, 40, 40, 44, 6, 219, 6, 43, 40, 44, 6, 6, 6, 6, 167, 6, 6, 6, 51, 42, 42, 42, 42, 42, 52, 6, 6, 224, 104, 105, 105, 106, 224, 6, 6, 43], [44, 2, 2, 2, 56, 53, 58, 55, 55, 55, 55, 55, 55, 59, 53, 53, 53, 40, 40, 44, 2, 100, 101, 2, 100, 101, 2, 100, 101, 2, 100, 101, 2, 2, 43, 40, 44, 6, 6, 6, 6, 229, 229, 229, 229, 229, 229, 229, 229, 6, 6, 6, 6, 6, 43, 40, 40, 44, 6, 220, 6, 43, 40, 44, 6, 6, 6, 218, 168, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 224, 111, 122, 123, 107, 224, 6, 6, 43], [44, 2, 2, 2, 56, 53, 57, 153, 154, 155, 207, 3, 3, 56, 53, 53, 53, 40, 40, 44, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 43, 40, 44, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43, 40, 40, 44, 153, 154, 155, 43, 40, 44, 6, 6, 6, 6, 167, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 224, 111, 181, 182, 107, 224, 6, 6, 43], [44, 2, 2, 2, 56, 53, 57, 158, 157, 156, 3, 3, 205, 56, 53, 53, 53, 40, 40, 44, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 201, 2, 43, 40, 44, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43, 40, 40, 44, 158, 157, 156, 43, 40, 44, 6, 6, 6, 6, 49, 41, 41, 41, 41, 41, 41, 41, 41, 41, 50, 6, 6, 224, 110, 109, 109, 108, 224, 6, 6, 43], [44, 2, 2, 2, 56, 53, 57, 3, 208, 3, 205, 3, 205, 56, 53, 53, 53, 40, 40, 44, 102, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 36, 43, 40, 44, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43, 40, 40, 47, 41, 41, 41, 48, 40, 44, 219, 6, 219, 6, 247, 245, 245, 245, 245, 245, 40, 40, 40, 40, 44, 6, 6, 224, 224, 224, 224, 224, 224, 6, 6, 43], [44, 2, 2, 2, 56, 53, 57, 3, 205, 3, 205, 3, 205, 56, 53, 53, 53, 40, 40, 44, 103, 2, 2, 2, 2, 92, 93, 93, 93, 94, 2, 2, 201, 37, 43, 40, 44, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43, 40, 40, 40, 40, 40, 40, 40, 40, 44, 6, 6, 6, 6, 247, 245, 245, 245, 245, 245, 40, 40, 40, 40, 44, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43], [44, 2, 2, 2, 56, 53, 57, 3, 205, 3, 205, 3, 205, 56, 53, 53, 53, 40, 40, 44, 2, 2, 2, 2, 2, 99, 39, 39, 39, 95, 2, 2, 201, 2, 43, 40, 44, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 43, 40, 40, 40, 40, 40, 40, 40, 40, 44, 6, 220, 219, 6, 43, 40, 40, 40, 245, 245, 40, 40, 40, 40, 47, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 48], [44, 2, 2, 2, 64, 55, 65, 3, 205, 3, 205, 3, 205, 56, 53, 53, 53, 40, 40, 44, 2, 201, 201, 2, 2, 99, 39, 39, 39, 95, 2, 2, 2, 2, 43, 40, 44, 2, 2, 2, 2, 2, 49, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 48, 40, 40, 40, 40, 40, 40, 40, 40, 44, 153, 154, 155, 49, 48, 40, 40, 40, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 40, 40, 40], [44, 3, 3, 3, 3, 3, 3, 3, 205, 3, 205, 3, 205, 56, 53, 53, 53, 40, 40, 44, 172, 173, 201, 2, 2, 99, 39, 39, 39, 95, 2, 2, 2, 2, 43, 40, 44, 2, 2, 2, 2, 2, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 44, 158, 157, 156, 43, 40, 40, 40, 40, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 245, 40, 40, 40], [44, 205, 205, 205, 205, 205, 205, 205, 205, 3, 205, 3, 205, 56, 53, 53, 53, 40, 40, 44, 2, 2, 201, 2, 2, 99, 39, 39, 39, 95, 2, 2, 2, 2, 43, 40, 44, 2, 2, 2, 2, 2, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 47, 41, 41, 41, 48, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 245, 245, 40, 40, 40], [44, 3, 205, 3, 3, 3, 3, 3, 3, 3, 3, 205, 3, 56, 53, 53, 53, 40, 40, 44, 2, 201, 201, 2, 2, 99, 39, 39, 39, 95, 2, 2, 2, 2, 43, 40, 44, 2, 2, 2, 2, 2, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 245, 245, 40, 40, 40], [44, 3, 206, 3, 205, 205, 3, 205, 3, 205, 3, 206, 3, 56, 53, 53, 53, 40, 40, 44, 172, 173, 201, 2, 2, 99, 39, 39, 39, 95, 2, 2, 2, 2, 43, 40, 44, 2, 2, 2, 2, 2, 43, 40, 45, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 46, 40, 40, 40, 45, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 246, 246, 42, 42, 46], [44, 153, 154, 155, 207, 3, 3, 3, 3, 209, 153, 154, 155, 56, 53, 53, 53, 40, 40, 44, 2, 201, 201, 2, 2, 99, 39, 39, 39, 95, 2, 2, 2, 2, 51, 42, 52, 2, 2, 2, 2, 2, 51, 42, 52, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 43, 40, 40, 40, 44, 153, 154, 155, 197, 2, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 4, 4, 4, 4, 4, 4, 4, 43], [44, 158, 157, 156, 3, 205, 3, 205, 3, 3, 158, 157, 156, 56, 53, 53, 53, 40, 40, 44, 2, 2, 2, 2, 2, 99, 39, 39, 39, 95, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 51, 42, 42, 42, 52, 158, 157, 156, 197, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 4, 4, 4, 4, 4, 4, 4, 43], [44, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 61, 53, 53, 53, 40, 40, 44, 102, 2, 2, 2, 2, 98, 97, 97, 97, 96, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 195, 195, 195, 195, 195, 195, 198, 195, 195, 2, 195, 195, 195, 195, 195, 195, 195, 2, 195, 195, 196, 195, 195, 2, 195, 4, 4, 4, 4, 4, 4, 4, 43], [44, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 40, 40, 44, 103, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 199, 153, 154, 155, 88, 80, 89, 4, 4, 4, 4, 4, 4, 4, 43], [44, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 53, 40, 40, 44, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 195, 2, 2, 158, 157, 156, 82, 79, 83, 4, 4, 4, 4, 4, 4, 4, 43], [44, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 44, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 195, 2, 195, 195, 196, 195, 195, 2, 195, 195, 196, 195, 195, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 88, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 87, 79, 83, 4, 4, 4, 4, 4, 4, 4, 43], [44, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 47, 41, 41, 41, 41, 50, 2, 2, 2, 2, 2, 2, 2, 2, 2, 49, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 50, 153, 154, 155, 197, 2, 199, 153, 154, 155, 49, 50, 2, 2, 49, 41, 41, 41, 50, 2, 195, 2, 90, 81, 85, 79, 79, 79, 84, 81, 81, 81, 81, 81, 81, 81, 91, 4, 4, 4, 4, 4, 4, 4, 43], [44, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 45, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 52, 2, 2, 2, 2, 2, 2, 2, 2, 2, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 44, 158, 157, 156, 197, 2, 199, 158, 157, 156, 43, 44, 2, 2, 43, 40, 40, 40, 44, 2, 2, 2, 2, 2, 82, 79, 79, 79, 83, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 43], [44, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 44, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 47, 41, 41, 41, 41, 41, 41, 41, 41, 41, 48, 44, 2, 2, 43, 40, 45, 42, 52, 195, 195, 2, 195, 2, 82, 79, 79, 79, 83, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 43], [44, 40, 40, 40, 40, 40, 40, 40, 45, 42, 42, 42, 42, 52, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 44, 2, 2, 43, 40, 44, 153, 154, 155, 197, 2, 2, 2, 82, 79, 79, 79, 86, 80, 80, 80, 80, 80, 80, 89, 4, 4, 4, 4, 4, 4, 4, 4, 43], [44, 42, 42, 42, 42, 42, 42, 42, 52, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 47, 41, 41, 48, 40, 44, 158, 157, 156, 197, 2, 195, 2, 90, 85, 79, 79, 84, 81, 81, 81, 81, 81, 85, 83, 4, 4, 4, 4, 4, 4, 4, 4, 43], [44, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 47, 41, 41, 41, 41, 50, 2, 2, 2, 82, 79, 79, 83, 4, 216, 153, 154, 155, 82, 83, 4, 4, 4, 4, 4, 4, 4, 4, 43], [44, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 43, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 44, 195, 196, 195, 82, 79, 79, 83, 4, 216, 158, 157, 156, 82, 83, 4, 4, 4, 4, 4, 4, 4, 4, 43], [44, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 49, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 48, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 44, 153, 154, 155, 82, 79, 79, 83, 4, 212, 212, 88, 80, 87, 86, 80, 80, 80, 89, 4, 4, 4, 4, 43], [44, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 43, 45, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 46, 40, 40, 40, 40, 40, 40, 40, 40, 40, 44, 158, 157, 156, 82, 79, 79, 83, 4, 212, 4, 82, 84, 81, 81, 81, 81, 81, 91, 4, 4, 4, 4, 43]], "dungeon_grid": [[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 13, 255, 0, 0, 0, 0, 0, 0, 9, 11, 0, 0, 0, 0, 0, 255], [0, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 0, 255, 255, 0, 0, 0, 255, 255, 255, 0, 0, 0, 255, 255, 0, 255], [0, 9, 0, 255, 255, 0, 11, 0, 0, 0, 255, 0, 0, 14, 0, 255, 255, 255, 0, 11, 11, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], [0, 15, 0, 255, 255, 0, 0, 0, 1, 0, 255, 255, 255, 255, 0, 255, 0, 255, 255, 255, 255, 0, 255, 0, 255, 0, 0, 0, 0, 0, 0, 255], [0, 0, 12, 0, 0, 0, 255, 255, 255, 255, 255, 0, 255, 0, 255, 255, 255, 0, 255, 12, 255, 255, 255, 10, 255, 255, 255, 14, 255, 0, 255, 255], [0, 0, 255, 0, 0, 0, 255, 0, 255, 255, 10, 0, 0, 0, 255, 255, 14, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 0, 255, 255, 255, 255], [0, 9, 0, 255, 255, 4, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 0, 14, 0, 0, 255, 0, 255, 255], [255, 255, 255, 255, 255, 0, 15, 9, 0, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], [0, 0, 14, 0, 4, 0, 14, 0, 10, 0, 255, 255, 0, 0, 255, 255, 0, 255, 255, 255, 255, 4, 255, 255, 255, 255, 0, 14, 0, 255, 255, 255], [0, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 0, 255, 255, 255, 0, 0, 255, 255, 255, 0, 255, 255, 255, 255, 15, 255], [0, 0, 0, 0, 0, 255, 255, 0, 0, 1, 0, 0, 0, 0, 0, 255, 255, 255, 255, 12, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255], [255, 0, 0, 0, 255, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 255, 0, 15, 255, 0, 255, 0, 255, 0, 255, 255, 255, 255, 255, 255, 15, 255], [0, 255, 255, 0, 255, 0, 255, 0, 0, 0, 0, 3, 0, 0, 0, 255, 9, 255, 0, 0, 255, 0, 255, 13, 255, 255, 255, 255, 255, 255, 255, 255], [0, 0, 0, 255, 255, 0, 0, 0, 0, 0, 13, 255, 0, 14, 0, 255, 1, 255, 0, 255, 255, 255, 9, 255, 255, 255, 255, 255, 255, 255, 0, 255], [0, 255, 0, 1, 0, 255, 0, 0, 0, 0, 0, 0, 255, 255, 3, 255, 14, 255, 255, 255, 0, 255, 255, 255, 0, 255, 255, 0, 255, 255, 0, 255], [0, 0, 255, 255, 0, 14, 0, 14, 0, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], [255, 255, 255, 0, 11, 0, 255, 0, 13, 0, 255, 0, 3, 0, 255, 255, 255, 0, 3, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 14, 0, 255], [255, 15, 255, 0, 0, 0, 255, 0, 11, 0, 255, 0, 0, 0, 255, 255, 255, 3, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], [0, 0, 0, 9, 0, 255, 255, 0, 1, 0, 0, 9, 0, 0, 255, 255, 0, 255, 255, 255, 0, 255, 0, 0, 255, 0, 255, 255, 255, 0, 255, 255], [0, 0, 0, 255, 0, 14, 0, 255, 255, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 0, 255, 0, 255, 0, 255], [255, 0, 255, 14, 255, 255, 255, 0, 0, 0, 0, 0, 0, 255, 11, 255, 255, 0, 255, 0, 255, 255, 255, 14, 255, 255, 255, 255, 255, 255, 0, 255], [255, 0, 255, 1, 255, 255, 255, 0, 255, 0, 255, 255, 0, 0, 0, 255, 0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 255, 0, 255, 255, 255], [0, 255, 0, 255, 15, 255, 0, 255, 15, 255, 0, 14, 0, 0, 0, 255, 14, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 15, 255], [0, 1, 0, 14, 0, 14, 0, 10, 0, 10, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 255, 255, 9, 255, 255, 255, 14, 255, 255, 14, 255, 255, 2, 255, 255, 2, 255, 255], [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 255, 255, 14, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], [0, 255, 0, 255, 0, 0, 0, 0, 3, 0, 14, 0, 0, 0, 255, 255, 0, 0, 0, 9, 0, 255, 255, 255, 255, 255, 255, 14, 255, 3, 255, 255], [14, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 255, 0, 11, 255, 0, 0, 3, 0, 0, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255], [255, 255, 255, 255, 0, 0, 1, 0, 0, 0, 0, 0, 0, 255, 255, 255, 0, 0, 4, 0, 255, 255, 15, 255, 0, 255, 14, 255, 255, 255, 255, 255], [0, 255, 255, 0, 255, 255, 0, 1, 0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 14, 255], [255, 0, 255, 255, 0, 15, 0, 0, 255, 0, 0, 0, 0, 255, 0, 255, 255, 11, 255, 255, 1, 255, 255, 0, 255, 0, 255, 255, 9, 255, 11, 255], [255, 0, 15, 255, 0, 0, 255, 13, 255, 13, 255, 255, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], [0, 0, 0, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 15, 255, 0, 14, 0, 255, 0, 255, 0, 0, 5, 1, 0, 5, 255, 255], [0, 255, 0, 255, 0, 255, 3, 255, 255, 255, 255, 255, 255, 1, 255, 255, 3, 255, 0, 14, 0, 3, 0, 0, 255, 0, 0, 0, 255, 0, 255, 255], [0, 3, 0, 255, 255, 255, 0, 255, 0, 0, 255, 0, 255, 0, 0, 255, 255, 255, 0, 0, 0, 0, 0, 255, 0, 255, 255, 0, 255, 255, 4, 255], [0, 0, 255, 255, 255, 255, 255, 255, 0, 0, 255, 0, 0, 0, 0, 255, 1, 255, 255, 0, 0, 14, 0, 255, 255, 11, 255, 255, 0, 255, 255, 255], [1, 255, 255, 11, 255, 255, 0, 1, 255, 3, 255, 255, 0, 255, 10, 255, 0, 0, 255, 0, 255, 1, 0, 255, 255, 0, 0, 0, 0, 255, 15, 255], [255, 0, 15, 0, 0, 255, 0, 0, 0, 255, 255, 0, 255, 0, 255, 255, 0, 0, 255, 255, 255, 0, 255, 255, 0, 255, 255, 0, 0, 0, 0, 255], [3, 255, 255, 0, 14, 0, 0, 3, 0, 2, 0, 255, 255, 255, 14, 255, 0, 255, 255, 15, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255], [2, 0, 255, 0, 1, 1, 0, 14, 0, 14, 0, 1, 1, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], [0, 14, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 255, 0, 255, 10, 255], [0, 255, 0, 255, 0, 0, 0, 255, 0, 255, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 255, 0, 255, 0, 14, 0, 255, 255, 255, 0, 255], [15, 255, 0, 15, 0, 255, 0, 1, 0, 255, 0, 0, 0, 0, 0, 255, 0, 255, 1, 255, 0, 0, 0, 255, 0, 255, 0, 255, 255, 255, 255, 255], [0, 14, 0, 255, 0, 255, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 255, 255, 255, 14, 255], [0, 255, 255, 255, 0, 14, 0, 255, 255, 255, 0, 255, 0, 0, 13, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 0, 255, 1, 255], [0, 255, 0, 15, 0, 4, 0, 255, 255, 255, 0, 0, 0, 0, 0, 255, 0, 255, 0, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255], [0, 255, 0, 0, 0, 0, 0, 255, 255, 5, 0, 0, 0, 0, 0, 255, 0, 255, 255, 255, 255, 255, 0, 255, 0, 255, 255, 255, 255, 255, 0, 255], [5, 0, 14, 0, 3, 0, 0, 14, 0, 0, 0, 3, 0, 14, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], [255, 255, 255, 0, 0, 0, 255, 255, 0, 0, 3, 0, 255, 255, 255, 255, 0, 0, 0, 0, 255, 0, 255, 255, 1, 255, 255, 0, 255, 255, 13, 255], [12, 255, 255, 255, 255, 0, 0, 255, 0, 255, 255, 0, 255, 255, 2, 255, 12, 255, 255, 0, 255, 255, 0, 0, 0, 255, 255, 0, 3, 0, 0, 255], [0, 1, 0, 0, 0, 1, 0, 255, 255, 0, 255, 255, 255, 255, 255, 255, 0, 255, 0, 255, 0, 255, 255, 0, 15, 0, 15, 0, 0, 0, 0, 255], [0, 0, 0, 255, 255, 255, 0, 0, 255, 255, 255, 0, 255, 255, 0, 255, 255, 0, 255, 255, 255, 255, 0, 255, 255, 255, 255, 0, 4, 0, 0, 255], [255, 0, 255, 255, 255, 255, 0, 0, 0, 0, 3, 0, 255, 255, 4, 255, 0, 3, 0, 0, 0, 0, 0, 255, 0, 255, 255, 255, 255, 15, 0, 255], [0, 255, 255, 255, 0, 255, 255, 0, 0, 11, 0, 0, 4, 0, 255, 255, 0, 0, 12, 0, 0, 255, 255, 0, 255, 255, 255, 0, 255, 255, 10, 255], [9, 255, 255, 255, 0, 0, 0, 0, 255, 255, 0, 0, 11, 0, 0, 255, 0, 255, 255, 255, 255, 0, 255, 0, 0, 0, 0, 255, 255, 255, 4, 255], [0, 0, 0, 0, 15, 0, 255, 255, 255, 255, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], [0, 1, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 0, 255, 255, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 14, 255], [0, 255, 255, 255, 255, 255, 0, 255, 0, 15, 0, 0, 0, 255, 13, 255, 0, 255, 0, 3, 0, 255, 0, 255, 255, 255, 255, 255, 0, 255, 0, 255], [1, 255, 15, 255, 3, 255, 0, 255, 0, 0, 0, 0, 0, 255, 0, 255, 0, 255, 0, 3, 0, 0, 0, 255, 0, 255, 255, 255, 255, 255, 255, 255], [0, 255, 255, 255, 255, 255, 0, 3, 0, 0, 0, 11, 0, 0, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 255], [0, 1, 0, 14, 0, 14, 0, 14, 0, 14, 0, 14, 0, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 255], [255, 0, 0, 0, 3, 0, 0, 0, 0, 15, 0, 0, 0, 0, 255, 255, 255, 0, 255, 255, 255, 0, 255, 255, 255, 255, 255, 0, 255, 255, 13, 255], [255, 0, 0, 0, 255, 0, 255, 0, 3, 0, 255, 0, 255, 0, 0, 255, 4, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 1, 255, 255], [255, 0, 255, 255, 0, 0, 0, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]], "town_grid": [[72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 75, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 72, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72], [72, 131, 131, 131, 134, 130, 130, 130, 130, 133, 131, 131, 131, 0, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 43, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 0, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 118, 118, 118, 118, 118, 118, 72], [72, 131, 131, 131, 131, 134, 130, 130, 133, 131, 131, 131, 131, 40, 43, 14, 14, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 14, 43, 37, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 0, 14, 14, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 14, 43, 43, 118, 118, 118, 118, 118, 118, 72], [72, 131, 131, 131, 131, 131, 134, 133, 131, 131, 131, 131, 131, 33, 43, 14, 14, 15, 15, 16, 16, 15, 15, 15, 16, 15, 16, 15, 16, 16, 15, 14, 43, 37, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 0, 14, 14, 16, 15, 16, 16, 16, 16, 15, 15, 16, 16, 15, 16, 14, 43, 37, 118, 118, 118, 118, 118, 118, 72], [72, 131, 131, 131, 131, 131, 135, 136, 131, 131, 131, 131, 131, 33, 43, 14, 14, 16, 15, 16, 16, 15, 15, 15, 15, 16, 16, 15, 15, 16, 15, 14, 43, 37, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 0, 14, 14, 16, 15, 16, 15, 15, 16, 16, 16, 15, 15, 15, 15, 14, 43, 37, 118, 118, 118, 118, 118, 118, 72], [72, 131, 131, 131, 131, 135, 132, 132, 136, 131, 131, 131, 131, 33, 43, 14, 14, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 14, 43, 43, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 107, 106, 0, 14, 14, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 14, 43, 37, 118, 118, 118, 118, 118, 118, 72], [72, 131, 131, 131, 135, 132, 132, 132, 132, 136, 131, 131, 131, 40, 43, 14, 14, 75, 104, 109, 110, 109, 109, 109, 110, 110, 110, 110, 109, 109, 72, 14, 14, 14, 14, 0, 0, 0, 0, 0, 0, 40, 32, 32, 32, 32, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 14, 75, 104, 109, 110, 109, 110, 109, 109, 110, 109, 110, 72, 14, 43, 43, 118, 118, 118, 118, 118, 118, 72], [72, 131, 131, 135, 132, 132, 132, 132, 132, 132, 136, 131, 131, 0, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 43, 43, 43, 43, 43, 43, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 118, 118, 118, 118, 118, 118, 72], [72, 131, 135, 132, 132, 132, 132, 132, 132, 132, 132, 136, 131, 0, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 118, 118, 118, 118, 118, 118, 72], [72, 135, 132, 132, 132, 132, 132, 132, 132, 132, 132, 132, 136, 0, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 18, 16, 15, 16, 16, 18, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 72, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 43, 118, 118, 118, 118, 118, 118, 72], [72, 0, 0, 0, 0, 0, 40, 32, 32, 32, 40, 0, 0, 0, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 109, 109, 109, 109, 110, 109, 110, 110, 110, 110, 18, 15, 16, 16, 15, 18, 104, 109, 110, 109, 110, 110, 109, 109, 109, 110, 109, 110, 110, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 37, 118, 118, 118, 118, 118, 118, 72], [72, 14, 14, 14, 14, 14, 43, 43, 43, 43, 43, 14, 14, 14, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 18, 16, 16, 16, 15, 18, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 37, 118, 118, 118, 118, 118, 120, 72], [72, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 18, 15, 16, 16, 16, 18, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 37, 118, 118, 118, 118, 120, 119, 72], [72, 72, 72, 72, 18, 16, 16, 16, 15, 18, 72, 72, 72, 72, 72, 72, 72, 72, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 18, 16, 15, 15, 15, 18, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 43, 118, 118, 118, 120, 119, 119, 72], [169, 109, 110, 109, 18, 15, 15, 15, 16, 18, 104, 110, 110, 110, 109, 109, 109, 110, 109, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 18, 16, 15, 15, 15, 18, 104, 169, 169, 169, 169, 169, 169, 169, 14, 14, 14, 14, 14, 14, 14, 14, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 118, 118, 120, 119, 119, 119, 72], [169, 169, 169, 169, 18, 15, 15, 16, 16, 18, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 18, 16, 16, 16, 15, 18, 103, 169, 169, 169, 169, 169, 169, 169, 14, 108, 108, 108, 108, 108, 14, 14, 17, 17, 17, 17, 17, 17, 17, 14, 14, 14, 118, 120, 119, 119, 119, 119, 72], [169, 169, 169, 169, 18, 16, 16, 15, 15, 18, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 74, 73, 73, 73, 73, 73, 73, 73, 73, 73, 73, 18, 15, 16, 15, 16, 18, 74, 169, 169, 169, 169, 169, 169, 169, 14, 108, 105, 105, 105, 108, 218, 14, 16, 15, 16, 16, 16, 15, 16, 14, 14, 14, 120, 119, 119, 119, 119, 119, 72], [169, 169, 169, 169, 18, 16, 15, 15, 15, 18, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 14, 108, 105, 105, 105, 108, 218, 14, 16, 16, 15, 15, 15, 16, 15, 14, 14, 14, 14, 40, 32, 32, 32, 40, 72], [169, 169, 169, 169, 18, 16, 15, 15, 15, 18, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 14, 108, 108, 108, 108, 108, 218, 14, 17, 17, 17, 17, 17, 17, 17, 14, 14, 14, 14, 43, 43, 43, 43, 43, 72], [169, 169, 169, 169, 18, 15, 15, 15, 15, 18, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 58, 58, 58, 58, 58, 58, 58, 58, 58, 14, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 14, 14, 0, 0, 0, 0, 0, 14, 103, 169, 169, 169, 169, 169, 72, 14, 14, 14, 14, 14, 14, 14, 14, 14, 72], [169, 169, 74, 72, 18, 15, 15, 16, 15, 18, 72, 72, 72, 72, 72, 72, 72, 72, 74, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 43, 58, 58, 58, 58, 58, 58, 58, 58, 58, 0, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 14, 14, 14, 14, 14, 14, 14, 14, 103, 169, 169, 169, 169, 169, 72, 72, 18, 15, 16, 16, 15, 18, 72, 72, 72], [169, 169, 72, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 37, 58, 58, 58, 58, 58, 58, 58, 58, 58, 0, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 109, 110, 110, 109, 110, 109, 110, 110, 169, 169, 169, 169, 169, 169, 109, 18, 15, 16, 15, 16, 18, 104, 109, 109], [169, 169, 72, 14, 14, 43, 43, 43, 43, 43, 14, 14, 14, 14, 14, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 37, 58, 58, 58, 58, 58, 58, 58, 58, 58, 0, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 18, 16, 15, 15, 16, 18, 103, 169, 169], [169, 169, 72, 14, 14, 43, 37, 37, 37, 43, 14, 14, 14, 14, 14, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 37, 59, 59, 59, 59, 59, 59, 59, 59, 59, 0, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 18, 15, 15, 15, 16, 18, 103, 169, 169], [169, 169, 114, 108, 108, 108, 108, 108, 108, 108, 108, 108, 108, 113, 14, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 43, 59, 59, 59, 59, 59, 59, 59, 59, 59, 0, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 18, 15, 16, 15, 16, 18, 103, 169, 169], [169, 169, 112, 114, 108, 108, 108, 108, 108, 108, 108, 108, 113, 112, 0, 14, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 59, 59, 59, 59, 59, 59, 59, 59, 59, 0, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 18, 16, 15, 16, 15, 18, 103, 169, 169], [169, 169, 112, 112, 114, 108, 108, 108, 108, 108, 108, 113, 112, 112, 0, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 58, 58, 58, 58, 58, 58, 58, 58, 58, 0, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 77, 71, 71, 71, 71, 71, 71, 78, 72, 18, 16, 16, 15, 16, 18, 72, 74, 169], [169, 169, 112, 112, 112, 114, 108, 108, 108, 108, 113, 112, 112, 112, 0, 14, 14, 14, 75, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 43, 43, 58, 58, 58, 58, 58, 58, 58, 58, 58, 40, 43, 14, 14, 75, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 72, 72, 72, 60, 77, 71, 71, 71, 71, 78, 60, 0, 43, 43, 43, 43, 43, 14, 14, 72, 103], [169, 169, 112, 112, 112, 112, 114, 108, 108, 113, 112, 112, 112, 112, 40, 43, 14, 14, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 14, 43, 37, 58, 58, 58, 58, 58, 58, 58, 58, 58, 32, 43, 14, 14, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 14, 43, 43, 60, 60, 77, 71, 71, 78, 60, 60, 0, 43, 37, 37, 37, 43, 14, 14, 72, 103], [169, 169, 112, 112, 112, 112, 112, 114, 113, 112, 112, 112, 112, 112, 33, 43, 14, 14, 16, 16, 15, 15, 16, 16, 15, 16, 16, 15, 15, 16, 15, 14, 43, 37, 59, 59, 59, 59, 59, 59, 59, 59, 59, 32, 43, 14, 14, 16, 15, 15, 16, 16, 16, 16, 15, 16, 15, 15, 15, 14, 43, 37, 60, 60, 60, 77, 78, 60, 60, 117, 60, 60, 60, 60, 60, 60, 117, 14, 72, 103], [169, 169, 112, 112, 112, 112, 112, 115, 116, 112, 112, 112, 112, 112, 33, 43, 14, 14, 16, 15, 15, 15, 15, 15, 15, 16, 15, 16, 15, 15, 16, 14, 43, 37, 59, 59, 59, 59, 59, 59, 59, 59, 59, 32, 43, 14, 14, 16, 16, 16, 16, 15, 16, 15, 15, 15, 16, 16, 16, 14, 43, 37, 60, 60, 60, 62, 60, 60, 117, 60, 60, 60, 60, 60, 60, 117, 60, 0, 72, 103], [169, 169, 112, 112, 112, 112, 115, 111, 111, 116, 112, 112, 112, 112, 33, 43, 14, 14, 16, 15, 16, 15, 16, 15, 16, 15, 15, 15, 16, 15, 15, 14, 43, 43, 59, 59, 59, 59, 59, 59, 59, 59, 59, 40, 43, 14, 14, 16, 15, 16, 15, 15, 16, 15, 15, 15, 15, 16, 16, 14, 43, 37, 60, 60, 60, 62, 60, 117, 60, 60, 60, 60, 60, 60, 117, 60, 60, 0, 72, 104], [169, 169, 112, 112, 112, 115, 111, 111, 111, 111, 116, 112, 112, 112, 40, 43, 14, 14, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 14, 14, 14, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 14, 14, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 14, 43, 43, 60, 60, 60, 62, 117, 60, 60, 60, 60, 60, 60, 117, 60, 60, 60, 0, 72, 104], [169, 169, 112, 112, 115, 111, 111, 111, 111, 111, 111, 116, 112, 112, 0, 14, 14, 14, 72, 103, 110, 110, 109, 110, 110, 109, 110, 109, 109, 110, 109, 129, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 129, 110, 109, 109, 110, 109, 110, 110, 109, 109, 109, 72, 14, 14, 14, 60, 60, 60, 80, 79, 79, 79, 79, 79, 79, 79, 81, 60, 60, 60, 0, 72, 103], [169, 169, 112, 115, 111, 111, 111, 111, 111, 111, 111, 111, 116, 112, 0, 14, 14, 14, 72, 104, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 109, 109, 109, 109, 110, 110, 109, 110, 110, 109, 109, 109, 109, 110, 110, 109, 109, 110, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 60, 60, 80, 79, 79, 79, 79, 79, 79, 79, 79, 79, 81, 60, 60, 0, 72, 104], [169, 169, 115, 111, 111, 111, 111, 111, 111, 111, 111, 111, 111, 116, 0, 72, 72, 72, 72, 103, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 60, 80, 79, 79, 79, 79, 79, 79, 79, 79, 79, 79, 79, 81, 60, 0, 72, 104], [169, 169, 109, 110, 110, 110, 109, 110, 110, 109, 110, 110, 110, 110, 109, 110, 110, 109, 110, 109, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 80, 79, 79, 79, 79, 79, 79, 79, 79, 79, 79, 79, 79, 79, 81, 0, 72, 103], [169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 14, 14, 14, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 72, 104], [169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 103], [169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 109, 110, 109, 110, 109, 110, 109, 109, 110, 109, 109, 110, 109, 110, 109, 109, 109, 109, 109, 110, 0]]};
+</script>
+<script>
+"use strict";
+/* ===================== Canvas & helpers ===================== */
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const W=cv.width, H=cv.height;
+const TILE=24, VIEW_W=Math.ceil(W/TILE), VIEW_H=Math.ceil((H-28)/TILE);
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const rnd=n=>Math.floor(Math.random()*n);
+const chance=p=>Math.random()<p;
+const pick=a=>a[rnd(a.length)];
+
+/* ===================== Game state ===================== */
+let G; // global game/save state
+function newGame(){
+  G={
+    scene:'overworld',
+    px:38, py:30, dir:0, // overworld pos
+    hp:40,maxhp:40, gold:30, coins:6, lvl:1, xp:0, xpnext:30,
+    str:6, cha:5, intel:5,
+    inv:{}, // item -> count
+    flags:{}, // quest flags
+    exhibitsSeen:{}, hintsSeen:0,
+    weapon:'Stone Knife', wdmg:4,
+    questStage:0, jewels:0,
+    steps:0,
+  };
+  addItem('Healing Herb',2);
+  G.flags.intro=false;
+}
+function addItem(n,c=1){G.inv[n]=(G.inv[n]||0)+c;}
+function hasItem(n){return (G.inv[n]||0)>0;}
+function useItem(n){if(G.inv[n]>0){G.inv[n]--; if(G.inv[n]===0) delete G.inv[n]; return true;} return false;}
+
+/* ===================== Content from decode ===================== */
+const EXHIBITS = CONTENT.museum||[];
+const HINTS = CONTENT.hints||[];
+
+// Curated museum exhibit definitions (text is authentic decoded; rewards mapped to lore)
+const MUSEUM_DISPLAYS = [
+  {name:"Welcome Hall", ex:16, coin:1, reward:r=>{}},
+  {name:"Stone Knife", ex:0, coin:1, reward:r=>grant('Stone Knife',1,"You may keep the primitive knife.")},
+  {name:"Staff of Sacrifice", ex:1, coin:2, reward:r=>{addItem('Bladed Staff',1);setWeapon('Bladed Staff',9);toast("Bladed Staff equipped!");}},
+  {name:"Town of Thornberry", ex:2, coin:1, reward:r=>{}},
+  {name:"Currency Room", ex:7, coin:1, reward:r=>{G.gold+=40;toast("+40 gold");}},
+  {name:"Pirate's Cave", ex:3, coin:2, reward:r=>{G.flags.knowPirate=true;}},
+  {name:"The Three Sisters", ex:4, coin:2, reward:r=>{G.flags.knowSapphire=true;}},
+  {name:"Healing Herbs", ex:5, coin:1, reward:r=>{addItem('Juton Fruit',1);toast("Juton Fruit acquired");}},
+  {name:"Flower Fountain", ex:6, coin:1, reward:r=>{G.flags.knowTulip=true;}},
+  {name:"Stones of Wisdom", ex:8, coin:1, reward:r=>{G.intel+=1;toast("Intelligence +1");}},
+  {name:"World Tapestry", ex:9, coin:1, reward:r=>{G.flags.haveMap=true;toast("World map revealed");}},
+  {name:"Catacombs of Armak", ex:10, coin:3, reward:r=>{G.flags.knowArmak=true;}},
+  {name:"Wizard of Arovyn", ex:13, coin:2, reward:r=>{G.flags.password=true;toast("Learned password: 'guardians'");}},
+  {name:"Frozen Pegasus", ex:14, coin:2, reward:r=>{G.flags.sawPegasus=true;}},
+];
+
+/* ===================== Sound (WebAudio, tiny) ===================== */
+let AC=null;
+function sfx(type){
+  try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);
+    const t=AC.currentTime;
+    const map={step:[220,.05,'triangle'],hit:[140,.12,'square'],hurt:[90,.16,'sawtooth'],
+      coin:[880,.12,'sine'],win:[660,.25,'triangle'],open:[520,.09,'sine'],bad:[70,.3,'sawtooth'],
+      heal:[700,.18,'sine'],lvl:[990,.3,'triangle']};
+    const m=map[type]||map.step; o.type=m[2]; o.frequency.setValueAtTime(m[0],t);
+    if(type==='win'||type==='lvl') o.frequency.linearRampToValueAtTime(m[0]*2,t+m[1]);
+    g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.18,t+.01);
+    g.gain.exponentialRampToValueAtTime(.0001,t+m[1]); o.start(t); o.stop(t+m[1]+.02);
+  }catch(e){}
+}
+
+/* ===================== Music (WebAudio sequencer) ===================== */
+const MUSIC={on:true, playing:false, nextT:0, step:0, track:'theme'};
+// "Tarmalon Theme" — A natural minor, lead + bass. [semitone offsets from A2]
+const SCALE=n=>110*Math.pow(2,n/12);
+const THEME_LEAD=[12,15,19,17,15,12,14,15, 12,15,19,22,19,15,17,12, 10,14,17,15,14,10,12,14, 7,10,14,12,10,7,9,12];
+const THEME_BASS=[0,0,7,7,5,5,3,3, 0,0,7,7,8,8,7,7, -2,-2,5,5,3,3,1,1, -5,-5,2,2,0,0,3,3];
+const BATTLE_LEAD=[12,12,15,12,17,12,15,12, 13,13,16,13,18,13,16,13];
+function musicToggle(){MUSIC.on=!MUSIC.on; if(!MUSIC.on){/*notes just stop scheduling*/} toast(MUSIC.on?"Music on":"Music off"); $('musbtn')&&($('musbtn').textContent=MUSIC.on?'♪':'♪̶');}
+function musicStart(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return;}} if(AC.state==='suspended')AC.resume(); MUSIC.playing=true; MUSIC.nextT=AC.currentTime+0.1; MUSIC.step=0; }
+function setTrack(t){ if(MUSIC.track!==t){MUSIC.track=t; MUSIC.step=0;} }
+function noteOn(freq,t,dur,type,vol){
+  const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=freq;
+  o.connect(g);g.connect(AC.destination);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.start(t);o.stop(t+dur+0.02);
+}
+function musicTick(){
+  if(!MUSIC.playing||!MUSIC.on||!AC) return;
+  const spb=(MUSIC.track==='battle')?0.16:0.22; // seconds per step
+  while(MUSIC.nextT < AC.currentTime+0.2){
+    const lead = MUSIC.track==='battle'?BATTLE_LEAD:THEME_LEAD;
+    const li = MUSIC.step % lead.length;
+    noteOn(SCALE(lead[li]+24), MUSIC.nextT, spb*0.9, 'square', 0.05);
+    if(MUSIC.track!=='battle'){
+      const bi=MUSIC.step%THEME_BASS.length;
+      if(MUSIC.step%2===0) noteOn(SCALE(THEME_BASS[bi]), MUSIC.nextT, spb*1.6, 'triangle', 0.08);
+    } else {
+      if(MUSIC.step%2===0) noteOn(SCALE(0+12), MUSIC.nextT, spb*1.2, 'sawtooth', 0.06);
+    }
+    MUSIC.nextT+=spb; MUSIC.step++;
+  }
+}
+
+/* ===================== Overworld map ===================== */
+// Tile codes: 0 deep water,1 water,2 grass,3 forest,4 mountain,5 sand,6 road,
+// 7 museum,8 town,9 dungeon,10 castle,11 bridge,12 flowers
+let OWMAP = null;
+function buildOverworld(){
+  const w=80,h=60;
+  const m=Array.from({length:h},()=>Array(w).fill(2));
+  // base noise: forests & mountains
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const n=Math.sin(x*0.3)+Math.cos(y*0.27)+Math.sin((x+y)*0.15);
+    if(n>1.3) m[y][x]=3; else if(n>1.05) m[y][x]=4;
+    if((x+y*7)%53===0) m[y][x]=3;
+  }
+  // ocean borders + a great lake
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    if(x<3||y<3||x>w-4||y>h-4) m[y][x]=(x<2||y<2||x>w-3||y>h-3)?0:1;
+  }
+  // inland lake (castle island)
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const dx=x-58,dy=y-16; if(dx*dx+dy*dy<70) m[y][x]=1;
+    if(dx*dx+dy*dy<10) m[y][x]=2; // island
+  }
+  // sandy southwest (three sisters)
+  for(let y=44;y<56;y++)for(let x=4;x<20;x++){ if(chance(.5)) m[y][x]= (chance(.4)?5:1); }
+  function place(x,y,t){m[y][x]=t;}
+  function road(x1,y1,x2,y2){ // simple L road
+    let x=x1,y=y1;
+    while(x!==x2){ if(m[y][x]!==7&&m[y][x]!==8&&m[y][x]!==9&&m[y][x]!==10) m[y][x]=(m[y][x]<=1?11:6); x+=Math.sign(x2-x);}
+    while(y!==y2){ if(m[y][x]!==7&&m[y][x]!==8&&m[y][x]!==9&&m[y][x]!==10) m[y][x]=(m[y][x]<=1?11:6); y+=Math.sign(y2-y);}
+  }
+  // Landmarks (the Museum is the hub, NE per the world tapestry exhibit)
+  LANDMARKS.forEach(L=>place(L.x,L.y,L.tile));
+  // roads connecting key spots to museum
+  const mus=LANDMARKS.find(l=>l.id==='museum');
+  LANDMARKS.filter(l=>l.id!=='museum').forEach(L=>road(mus.x,mus.y,L.x,L.y));
+  // clear walkable ring around each landmark
+  LANDMARKS.forEach(L=>{for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+    const nx=L.x+dx,ny=L.y+dy; if(nx>0&&ny>0&&nx<w-1&&ny<h-1&&(dx||dy)&&m[ny][nx]<=1) m[ny][nx]=2;}});
+  return {w,h,m};
+}
+const LANDMARKS=[
+  {id:'museum',name:"Galactic Museum",x:60,y:8,tile:7},
+  {id:'thornberry',name:"Thornberry",x:46,y:18,tile:8},
+  {id:'bigrapids',name:"Big Rapids",x:30,y:12,tile:8},
+  {id:'laingsburg',name:"Laingsburg",x:50,y:34,tile:8},
+  {id:'holypoint',name:"Holy Point",x:22,y:40,tile:8},
+  {id:'eaglehollow',name:"Eagle Hollow",x:14,y:26,tile:8},
+  {id:'armak',name:"Catacombs of Armak",x:38,y:44,tile:9},
+  {id:'castle',name:"Kelfor Castle",x:58,y:16,tile:10},
+  {id:'piratecave',name:"Pirate's Lair",x:8,y:50,tile:9},
+];
+OWMAP = buildOverworld();
+function landmarkAt(x,y){return LANDMARKS.find(l=>l.x===x&&l.y===y);}
+function walkableOW(t){return t!==0&&t!==1&&t!==4;} // water & mountains block; everything else ok
+
+/* ===================== Interiors ===================== */
+// Town: simple plaza with shop doors. Generated, polished look.
+const SHOPS=[
+  {k:'buyback',name:"Buyback Shop",color:'#caa24a',icon:'🛒'},
+  {k:'bank',name:"Lender & Bank",color:'#5cc6ff',icon:'🏦'},
+  {k:'healer',name:"Healer",color:'#7ee08a',icon:'➕'},
+  {k:'game',name:"Stones of Wisdom",color:'#c47aff',icon:'🎲'},
+  {k:'inn',name:"Inn",color:'#e0a06a',icon:'🛏'},
+];
+function buildTown(){
+  const w=22,h=14, m=Array.from({length:h},()=>Array(w).fill(20)); //20 floor
+  for(let x=0;x<w;x++){m[0][x]=21;m[h-1][x]=21;}
+  for(let y=0;y<h;y++){m[y][0]=21;m[y][w-1]=21;}
+  m[h-1][w>>1]=22; // exit gate
+  // fountain center
+  m[6][10]=24;m[6][11]=24;m[7][10]=24;m[7][11]=24;
+  // shop buildings along top
+  const doors=[];
+  const xs=[3,6,9,12,15,18];
+  SHOPS.forEach((s,i)=>{const x=xs[i]||3; m[2][x]=23; doors.push({x,y:2,shop:s});});
+  // a few NPCs
+  const npcs=[{x:4,y:9},{x:16,y:10},{x:11,y:11}];
+  return {w,h,m,doors,npcs};
+}
+
+/* ===================== Dungeon (from decoded grid) ===================== */
+function buildDungeon(){
+  const grid=CONTENT.dungeon_grid;
+  const h=grid.length, w=grid[0].length;
+  // map raw tile-ids: 0xff(255)=wall, else floor/feature. Build clean maze.
+  const m=Array.from({length:h},(_,y)=>Array.from({length:w},(_,x)=>grid[y][x]===255?31:30));
+  // ensure an entry & exit (stairs up = goal)
+  let sx=1,sy=1; outer: for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){if(m[y][x]===30){sx=x;sy=y;break outer;}}
+  // place exit far away (last floor tile)
+  let ex=sx,ey=sy; for(let y=h-2;y>0;y--)for(let x=w-2;x>0;x--){if(m[y][x]===30){ex=x;ey=y;y=0;break;}}
+  m[ey][ex]=33; // stairs up
+  // treasure chests on a few floor tiles
+  const chests=[]; let placed=0;
+  for(let y=1;y<h-1&&placed<6;y++)for(let x=1;x<w-1&&placed<6;x++){
+    if(m[y][x]===30 && (x*7+y*13)%29===0 && !(x===sx&&y===sy)){m[y][x]=34;chests.push({x,y});placed++;}
+  }
+  return {w,h,m,sx,sy,ex,ey};
+}
+
+// Pirate's Lair — a watery sea-cave. Carved caverns with water channels (impassable),
+// a few treasure chests, and the SAPPHIRE in the deepest chamber.
+function buildPirateLair(){
+  const w=34,h=26;
+  const m=Array.from({length:h},()=>Array(w).fill(31)); // 31 = rock wall
+  // carve caverns with a drunkard's-walk per chamber, connect rooms
+  const rooms=[[3,3,8,6],[14,2,7,7],[24,4,7,8],[5,13,9,8],[18,12,12,6],[20,19,11,5],[3,20,8,4]];
+  rooms.forEach(([rx,ry,rw,rh])=>{for(let y=ry;y<ry+rh&&y<h-1;y++)for(let x=rx;x<rx+rw&&x<w-1;x++)m[y][x]=30;});
+  // corridors
+  function carveH(y,x1,x2){for(let x=Math.min(x1,x2);x<=Math.max(x1,x2);x++)m[y][x]=30;}
+  function carveV(x,y1,y2){for(let y=Math.min(y1,y2);y<=Math.max(y1,y2);y++)m[y][x]=30;}
+  carveH(6,10,14);carveV(17,8,12);carveH(8,21,24);carveV(9,18,20);carveH(17,12,20);carveV(26,11,19);carveH(21,9,20);carveV(8,15,20);
+  // water pools (36 = water, impassable but pretty)
+  function pool(cx,cy,r){for(let y=cy-r;y<=cy+r;y++)for(let x=cx-r;x<=cx+r;x++){
+    if(x>0&&y>0&&x<w-1&&y<h-1&&Math.hypot(x-cx,y-cy)<=r&&m[y][x]===30)m[y][x]=36;}}
+  pool(7,16,2);pool(27,7,2);pool(24,21,1);
+  // start near top-left, exit (stairs) near top-left too (return), sapphire deepest
+  const sx=4,sy=4; m[sy][sx]=30;
+  m[4][5]=33; // stairs back up near entrance
+  // chests scattered
+  const chests=[[16,3],[28,6],[6,15],[26,13]];
+  chests.forEach(([x,y])=>{if(m[y][x]===30)m[y][x]=34;});
+  // SAPPHIRE in deepest chamber (bottom-right room)
+  let bx=22,by=21; while(m[by][bx]!==30 && bx>20){bx--;} m[by][bx]=35;
+  return {w,h,m,sx,sy,theme:'pirate'};
+}
+
+/* ===================== Monsters ===================== */
+const MONSTERS=[
+  {n:"Slash Nettle",hp:10,atk:3,xp:8,gold:6,weak:'Stone Knife'},
+  {n:"Sea Swallow",hp:14,atk:5,xp:12,gold:10},
+  {n:"Maston Leaper",hp:20,atk:7,xp:20,gold:16,weak:'Bladed Staff'},
+  {n:"Warlord's Agent",hp:24,atk:9,xp:26,gold:24},
+  {n:"Neural Cloud",hp:30,atk:11,xp:36,gold:30,weak:'Bladed Staff'},
+  {n:"Cave Marauder",hp:34,atk:13,xp:44,gold:40},
+];
+function monsterFor(){
+  let tier = G.scene==='dungeon'?2:0;
+  tier += Math.min(3, Math.floor(G.lvl/2));
+  const lo=clamp(tier-1,0,MONSTERS.length-1), hi=clamp(tier+1,0,MONSTERS.length-1);
+  return Object.assign({},MONSTERS[lo+rnd(hi-lo+1)]);
+}
+
+/* ===================== Monster sprites (procedural) ===================== */
+// Each creature drawn from simple canvas shapes. cx,cy = center, s = scale (px radius-ish)
+function drawCreature(name, cx, cy, s, t){
+  ctx.save();
+  const bob=Math.sin((t||wob)*0.08)*s*0.06;
+  cy+=bob;
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(cx,cy+s*0.95,s*0.7,s*0.18,0,0,7);ctx.fill();
+  const I=n=>name.indexOf(n)>=0;
+  if(I('Slash Nettle')){ // spiky plant
+    ctx.fillStyle='#2f8f3a';ctx.beginPath();ctx.ellipse(cx,cy,s*0.55,s*0.7,0,0,7);ctx.fill();
+    ctx.strokeStyle='#1c5a24';ctx.lineWidth=Math.max(1,s*0.08);
+    for(let a=0;a<8;a++){const ang=a/8*6.283;ctx.beginPath();ctx.moveTo(cx,cy);
+      ctx.lineTo(cx+Math.cos(ang)*s*0.9,cy+Math.sin(ang)*s*0.9);ctx.stroke();}
+    ctx.fillStyle='#d6f25a';ctx.beginPath();ctx.arc(cx,cy,s*0.22,0,7);ctx.fill();
+  } else if(I('Sea Swallow')){ // dart-like sea bird/fish
+    ctx.fillStyle='#3aa0d0';ctx.beginPath();ctx.moveTo(cx-s,cy);ctx.quadraticCurveTo(cx,cy-s*0.7,cx+s,cy);
+    ctx.quadraticCurveTo(cx,cy+s*0.7,cx-s,cy);ctx.fill();
+    ctx.fillStyle='#bfe9ff';ctx.beginPath();ctx.moveTo(cx-s*0.2,cy);ctx.lineTo(cx-s*0.9,cy-s*0.6);ctx.lineTo(cx-s*0.4,cy);ctx.fill();
+    ctx.fillStyle='#06243a';ctx.beginPath();ctx.arc(cx+s*0.5,cy-s*0.08,s*0.1,0,7);ctx.fill();
+  } else if(I('Maston Leaper')){ // frog/toad leaper
+    ctx.fillStyle='#7a9c3a';ctx.beginPath();ctx.ellipse(cx,cy+s*0.15,s*0.8,s*0.6,0,0,7);ctx.fill();
+    ctx.fillStyle='#9ec24a';ctx.beginPath();ctx.ellipse(cx,cy-s*0.2,s*0.55,s*0.4,0,0,7);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx-s*0.3,cy-s*0.35,s*0.2,0,7);ctx.arc(cx+s*0.3,cy-s*0.35,s*0.2,0,7);ctx.fill();
+    ctx.fillStyle='#111';ctx.beginPath();ctx.arc(cx-s*0.3,cy-s*0.32,s*0.09,0,7);ctx.arc(cx+s*0.3,cy-s*0.32,s*0.09,0,7);ctx.fill();
+  } else if(I('Agent')){ // cloaked figure
+    ctx.fillStyle='#3a2a4a';ctx.beginPath();ctx.moveTo(cx,cy-s);ctx.lineTo(cx+s*0.7,cy+s*0.9);ctx.lineTo(cx-s*0.7,cy+s*0.9);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#0a0612';ctx.beginPath();ctx.arc(cx,cy-s*0.45,s*0.35,0,7);ctx.fill();
+    ctx.fillStyle='#ff5a5a';ctx.fillRect(cx-s*0.18,cy-s*0.5,s*0.12,s*0.08);ctx.fillRect(cx+s*0.06,cy-s*0.5,s*0.12,s*0.08);
+  } else if(I('Neural Cloud')){ // glowing cloud with eyes
+    ctx.fillStyle='rgba(150,90,220,.85)';
+    for(const o of [[-.5,0,.6],[.5,0,.6],[0,-.3,.7],[0,.2,.65]]){ctx.beginPath();ctx.arc(cx+o[0]*s,cy+o[1]*s,o[2]*s,0,7);ctx.fill();}
+    ctx.fillStyle='#e6c8ff';for(const e of [[-.3,-.1],[.3,-.1]]){ctx.beginPath();ctx.arc(cx+e[0]*s,cy+e[1]*s,s*0.13,0,7);ctx.fill();}
+    ctx.strokeStyle='rgba(200,160,255,.5)';ctx.lineWidth=s*0.05;ctx.beginPath();ctx.arc(cx,cy,s*1.05,0,7);ctx.stroke();
+  } else if(I('Guard-Beast')||I('Marauder')){ // brute
+    ctx.fillStyle='#7a4a2a';ctx.beginPath();ctx.ellipse(cx,cy+s*0.2,s*0.85,s*0.7,0,0,7);ctx.fill();
+    ctx.fillStyle='#5a3320';ctx.beginPath();ctx.arc(cx,cy-s*0.4,s*0.45,0,7);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(cx-s*0.2,cy-s*0.1);ctx.lineTo(cx-s*0.05,cy+s*0.1);ctx.lineTo(cx-s*0.35,cy+s*0.1);ctx.fill();
+    ctx.beginPath();ctx.moveTo(cx+s*0.2,cy-s*0.1);ctx.lineTo(cx+s*0.35,cy+s*0.1);ctx.lineTo(cx+s*0.05,cy+s*0.1);ctx.fill();
+    ctx.fillStyle='#ffd24a';ctx.beginPath();ctx.arc(cx-s*0.2,cy-s*0.45,s*0.1,0,7);ctx.arc(cx+s*0.2,cy-s*0.45,s*0.1,0,7);ctx.fill();
+  } else if(I('Guard')){ // castle guard
+    ctx.fillStyle='#5a6a8a';ctx.fillRect(cx-s*0.45,cy-s*0.5,s*0.9,s*1.2);
+    ctx.fillStyle='#c0c8e0';ctx.beginPath();ctx.arc(cx,cy-s*0.55,s*0.3,0,7);ctx.fill();
+    ctx.fillStyle='#caa24a';ctx.fillRect(cx+s*0.4,cy-s*0.9,s*0.12,s*1.5); // spear
+  } else { // default blob
+    ctx.fillStyle='#9a5ad0';ctx.beginPath();ctx.arc(cx,cy,s*0.7,0,7);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx-s*0.2,cy-s*0.1,s*0.12,0,7);ctx.arc(cx+s*0.2,cy-s*0.1,s*0.12,0,7);ctx.fill();
+  }
+  ctx.restore();
+}
+// small map-icon version for roamers
+function drawRoamerIcon(name,sx,sy){ drawCreature(name, sx+TILE/2, sy+TILE/2-2, TILE*0.42, wob); }
+
+/* ===================== Roaming monsters ===================== */
+let owRoamers=[], dunRoamers=[];
+function isWild(t){return t===2||t===3||t===5;}
+function tierIndex(){ return clamp(Math.floor(G.lvl/2),0,MONSTERS.length-1); }
+function randMonsterIdx(base){ const t=base!=null?base:tierIndex(); const lo=clamp(t-1,0,MONSTERS.length-1),hi=clamp(t+1,0,MONSTERS.length-1); return lo+rnd(hi-lo+1); }
+function spawnRoamers(){
+  owRoamers=[]; dunRoamers=[];
+  if(!G) return;
+  if(G.scene==='overworld'){
+    for(let i=0;i<11;i++){ let x,y,tr=0;
+      do{x=2+rnd(OWMAP.w-4);y=2+rnd(OWMAP.h-4);tr++;}while((!isWild(OWMAP.m[y][x])||landmarkAt(x,y)||Math.hypot(x-G.px,y-G.py)<4)&&tr<60);
+      if(tr<60) owRoamers.push({x,y,mi:randMonsterIdx()}); }
+  }
+}
+function spawnDunRoamers(){
+  dunRoamers=[];
+  if(!DUN) return;
+  const base=DUN.theme==='pirate'?3:2;
+  let placed=0;
+  for(let k=0;k<300&&placed<8;k++){ const x=1+rnd(DUN.w-2),y=1+rnd(DUN.h-2);
+    if(DUN.m[y][x]===30 && Math.hypot(x-P.x,y-P.y)>4){ dunRoamers.push({x,y,mi:randMonsterIdx(base)}); placed++; } }
+}
+function stepRoamers(list, walk){
+  for(const r of list){
+    if(chance(0.6)){
+      const dirs=[[0,-1],[0,1],[-1,0],[1,0]];
+      // bias toward player
+      let d=pick(dirs);
+      if(chance(0.45)){ d=[Math.sign(G.px-r.x)||0, 0]; if(d[0]===0)d=[0,Math.sign(G.py-r.y)||0]; }
+      const nx=r.x+d[0], ny=r.y+d[1];
+      if(walk(nx,ny)){ r.x=nx; r.y=ny; }
+    }
+  }
+}
+function owWalk(x,y){ return x>1&&y>1&&x<OWMAP.w-2&&y<OWMAP.h-2 && isWild(OWMAP.m[y][x]) && !landmarkAt(x,y); }
+function dunWalk(x,y){ return x>0&&y>0&&x<DUN.w-1&&y<DUN.h-1 && DUN.m[y][x]===30; }
+function checkRoamerCollision(list){
+  const tx=G.scene==='overworld'?G.px:P.x, ty=G.scene==='overworld'?G.py:P.y;
+  const i=list.findIndex(r=>r.x===tx&&r.y===ty);
+  if(i>=0){ const r=list[i]; list.splice(i,1); startBattle(Object.assign({},MONSTERS[r.mi])); return true; }
+  return false;
+}
+
+/* ===================== Save / Load ===================== */
+const SAVE_KEY='lota_save_v1';
+function snapshot(){ return JSON.stringify({G,t:currentTownId,hintIdx,v:1}); }
+function saveGame(){
+  try{ localStorage.setItem(SAVE_KEY, snapshot()); toast('Game saved'); sfx('coin'); return true; }
+  catch(e){ toast('localStorage blocked — use Export instead'); return false; }
+}
+function hasSave(){ try{ return !!localStorage.getItem(SAVE_KEY); }catch(e){ return false; } }
+function restoreFrom(o){
+  if(!o||!o.G){toast('Invalid save');return false;}
+  G=o.G; currentTownId=o.t||null; hintIdx=o.hintIdx||0;
+  $('title').style.display='none';
+  if(!AC)musicStart(); setTrack('theme'); B=null; closeMenu();
+  const sc=G.scene;
+  if(sc==='town'){ TOWN=buildTown(); P.x=TOWN.w>>1; P.y=TOWN.h-2; }
+  else if(sc==='dungeon'){ G.scene='overworld'; toast('Returned to overworld'); } // safest
+  else if(sc==='museum'){ P.mi=0; }
+  if(G.scene==='overworld') setHint(OW_HINT);
+  spawnRoamers(); spawnDunRoamers();
+  return true;
+}
+function loadGame(){
+  try{ const raw=localStorage.getItem(SAVE_KEY); if(!raw){toast('No save found');return false;}
+    if(restoreFrom(JSON.parse(raw))){ toast('Game loaded'); sfx('open'); return true; } }
+  catch(e){ toast('Load failed'); }
+  return false;
+}
+function exportSave(){
+  try{ const b=new Blob([snapshot()],{type:'application/json'}); const u=URL.createObjectURL(b);
+    const a=document.createElement('a'); a.href=u; a.download='legacy-of-the-ancients-save.json'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(u),1500); toast('Save file downloaded'); }catch(e){ toast('Export failed'); }
+}
+function importSave(){ const inp=$('fileimport'); if(inp) inp.click(); }
+function handleImport(file){
+  const fr=new FileReader();
+  fr.onload=()=>{ try{ if(restoreFrom(JSON.parse(fr.result))) toast('Save imported'); }catch(e){ toast('Bad save file'); } };
+  fr.readAsText(file);
+}
+function systemMenu(){
+  openMenu("System",[
+    {label:"Save game",sub:"to this browser"},
+    {label:"Load game",sub:hasSave()?"":"(no save)"},
+    {label:"Export save to file"},
+    {label:"Import save from file"},
+    {label:"Music: "+(MUSIC.on?"on":"off"),sub:"P"},
+    {label:"Resume"},
+  ],(it,i)=>{ if(i===0)saveGame(); else if(i===1)loadGame(); else if(i===2)exportSave();
+    else if(i===3)importSave(); else if(i===4){if(!AC)musicStart();musicToggle();} });
+}
+
+/* ===================== Rendering ===================== */
+// color palettes for procedural tiles
+function shade(c,f){const n=parseInt(c.slice(1),16);let r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  r=clamp(r*f|0,0,255);g=clamp(g*f|0,0,255);b=clamp(b*f|0,0,255);return `rgb(${r},${g},${b})`;}
+function tileColor(t){
+  switch(t){
+    case 0:return '#0a2452'; case 1:return '#16407a'; case 2:return '#3f7a3a';
+    case 3:return '#235a2e'; case 4:return '#6b6b78'; case 5:return '#c9b876';
+    case 6:return '#9a7b4a'; case 11:return '#8a6a3a';
+    case 7:return '#caa24a'; case 8:return '#b6603a'; case 9:return '#4a3a5a';
+    case 10:return '#8a8aa8'; case 12:return '#3f7a3a';
+    case 20:return '#5a5040'; case 21:return '#33384e'; case 22:return '#7a5a2a';
+    case 23:return '#caa24a'; case 24:return '#16407a';
+    case 30:return '#2a2236'; case 31:return '#13101c'; case 33:return '#caa24a'; case 34:return '#caa24a';
+    case 35:return '#1a2a4a'; case 36:return '#16407a';
+    default:return '#3f7a3a';
+  }
+}
+function drawTile(t,sx,sy,wob){
+  const base=tileColor(t);
+  ctx.fillStyle=base; ctx.fillRect(sx,sy,TILE,TILE);
+  // texture / icon per type
+  ctx.save();
+  if(t===1||t===0||t===24||t===36){ // water shimmer
+    ctx.fillStyle=shade(base,1.3);
+    const o=(wob+sx+sy)%TILE;
+    ctx.fillRect(sx,sy+(o%6),TILE,2);
+  } else if(t===3){ // forest
+    ctx.fillStyle='#1a4322';ctx.fillRect(sx,sy,TILE,TILE);
+    ctx.fillStyle='#2f7a37'; for(let i=0;i<3;i++){const tx=sx+5+i*7,ty=sy+6+((i*5)%8);
+      ctx.beginPath();ctx.arc(tx,ty,4,0,7);ctx.fill();}
+    ctx.fillStyle='#6b4a2a';
+  } else if(t===4){ // mountain
+    ctx.fillStyle='#52525e';ctx.fillRect(sx,sy,TILE,TILE);
+    ctx.fillStyle='#7a7a8a';ctx.beginPath();ctx.moveTo(sx+3,sy+TILE-3);ctx.lineTo(sx+12,sy+5);ctx.lineTo(sx+21,sy+TILE-3);ctx.fill();
+    ctx.fillStyle='#dfe2ee';ctx.beginPath();ctx.moveTo(sx+9,sy+9);ctx.lineTo(sx+12,sy+5);ctx.lineTo(sx+15,sy+9);ctx.fill();
+  } else if(t===6||t===11){ ctx.fillStyle=shade(base,0.85);ctx.fillRect(sx+2,sy+2,TILE-4,TILE-4);}
+  // structures with emblem
+  const emb={7:'🏛',8:'🏘',9:'☗',10:'🏰',23:'🚪',22:'⛩',33:'↑',34:'▣',35:'💎'};
+  if(emb[t]){
+    if(t===7||t===8||t===9||t===10||t===23||t===22){ // building base
+      ctx.fillStyle=shade(base,0.7);ctx.fillRect(sx+2,sy+4,TILE-4,TILE-6);
+      ctx.fillStyle=shade(base,1.2);ctx.fillRect(sx+2,sy+4,TILE-4,3);
+    }
+    ctx.font='15px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(emb[t],sx+TILE/2,sy+TILE/2+1);
+  }
+  ctx.restore();
+  // subtle grid
+  ctx.strokeStyle='rgba(0,0,0,.12)';ctx.strokeRect(sx+.5,sy+.5,TILE,TILE);
+}
+let wob=0;
+function drawPlayer(sx,sy){
+  ctx.save();
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(sx+TILE/2,sy+TILE-3,8,3,0,0,7);ctx.fill();
+  // body (hooded explorer)
+  ctx.fillStyle='#2a3a6a';ctx.fillRect(sx+7,sy+9,10,12);
+  ctx.fillStyle='#e8c89a';ctx.beginPath();ctx.arc(sx+12,sy+8,5,0,7);ctx.fill(); //head
+  ctx.fillStyle='#caa24a';ctx.fillRect(sx+7,sy+4,10,3); // gold hood trim
+  ctx.restore();
+}
+
+function render(){
+  wob++;
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  if(B){ renderBattle(); return; }
+  if(G&&(G.scene==='overworld')) renderGrid(OWMAP,G.px,G.py);
+  else if(G&&G.scene==='town') renderInterior(TOWN);
+  else if(G&&G.scene==='dungeon') renderInterior(DUN,true);
+  else if(G&&G.scene==='museum') renderMuseum();
+}
+function renderBattle(){
+  // arena backdrop
+  const dun=(G.scene_prev==='dungeon');
+  const g=ctx.createLinearGradient(0,0,0,H);
+  if(dun){g.addColorStop(0,'#1a1226');g.addColorStop(1,'#070510');}
+  else {g.addColorStop(0,'#243a52');g.addColorStop(.6,'#3a5a3a');g.addColorStop(1,'#2a3a22');}
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // ground band
+  ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(0,H*0.6,W,H*0.4);
+  // monster (big)
+  drawCreature(B.m.n, W*0.5, H*0.36, 52, wob);
+  // monster name + hp bar
+  ctx.textAlign='center';ctx.fillStyle='#f4c860';ctx.font='bold 16px serif';
+  ctx.fillText(B.m.n, W/2, 24);
+  const bw=200,bx=(W-bw)/2,by=32, frac=clamp(B.mhp/B.m.hp,0,1);
+  ctx.fillStyle='#2a1414';ctx.fillRect(bx,by,bw,8);
+  ctx.fillStyle='#ff5a5a';ctx.fillRect(bx,by,bw*frac,8);
+  ctx.strokeStyle='#51202a';ctx.strokeRect(bx+.5,by+.5,bw,8);
+  // hero avatar bottom-left
+  drawPlayer(W*0.16-12, H*0.62);
+  // battle log strip
+  ctx.fillStyle='rgba(7,9,18,.85)';ctx.fillRect(0,H-58,W,26);
+  ctx.fillStyle='#e8edff';ctx.font='12px sans-serif';ctx.textAlign='center';
+  ctx.fillText((B.log||'').slice(0,70),W/2,H-41);
+}
+function renderGrid(map,cx,cy){
+  const ox=clamp(cx-(VIEW_W>>1),0,map.w-VIEW_W);
+  const oy=clamp(cy-(VIEW_H>>1),0,map.h-VIEW_H);
+  for(let y=0;y<VIEW_H;y++)for(let x=0;x<VIEW_W;x++){
+    const mx=ox+x,my=oy+y; if(mx<0||my<0||mx>=map.w||my>=map.h){continue;}
+    drawTile(map.m[my][mx], x*TILE, y*TILE+28, wob);
+  }
+  // roaming monsters
+  if(map===OWMAP){ for(const r of owRoamers){ const sx=(r.x-ox)*TILE,sy=(r.y-oy)*TILE+28;
+    if(sx>-TILE&&sx<W&&sy>0&&sy<H) drawRoamerIcon(MONSTERS[r.mi].n,sx,sy); } }
+  drawPlayer((cx-ox)*TILE,(cy-oy)*TILE+28);
+  // landmark labels near
+  if(map===OWMAP){ctx.font='9px sans-serif';ctx.textAlign='center';
+    LANDMARKS.forEach(L=>{const sx=(L.x-ox)*TILE+TILE/2,sy=(L.y-oy)*TILE+28-3;
+      if(sx>0&&sx<W&&sy>10&&sy<H){ctx.fillStyle='rgba(0,0,0,.6)';
+        const w2=ctx.measureText(L.name).width+6;ctx.fillRect(sx-w2/2,sy-9,w2,10);
+        ctx.fillStyle='#f4c860';ctx.fillText(L.name,sx,sy-1);}});}
+}
+function renderInterior(map,dark){
+  const ox=clamp(P.x-(VIEW_W>>1),0,Math.max(0,map.w-VIEW_W));
+  const oy=clamp(P.y-(VIEW_H>>1),0,Math.max(0,map.h-VIEW_H));
+  for(let y=0;y<VIEW_H;y++)for(let x=0;x<VIEW_W;x++){
+    const mx=ox+x,my=oy+y; if(mx<0||my<0||mx>=map.w||my>=map.h){continue;}
+    const t=map.m[my][mx];
+    if(dark){ // fog of war / torch
+      const d=Math.hypot(mx-P.x,my-P.y);
+      drawTile(t,x*TILE,y*TILE+28,wob);
+      if(d>3.2){ctx.fillStyle=`rgba(0,0,0,${clamp((d-3.2)/3,0,.92)})`;ctx.fillRect(x*TILE,y*TILE+28,TILE,TILE);}
+    } else drawTile(t,x*TILE,y*TILE+28,wob);
+  }
+  if(map.doors) map.doors.forEach(d=>{}); // doors drawn as tiles already
+  if(map.npcs) map.npcs.forEach(n=>{const sx=(n.x-ox)*TILE,sy=(n.y-oy)*TILE+28;
+    ctx.fillStyle='#7ee08a';ctx.beginPath();ctx.arc(sx+12,sy+12,6,0,7);ctx.fill();
+    ctx.fillStyle='#0b0f1c';ctx.font='10px serif';ctx.textAlign='center';ctx.fillText('?',sx+12,sy+15);});
+  // dungeon roamers (only within torchlight)
+  if(dark&&map===DUN){ for(const r of dunRoamers){ const d=Math.hypot(r.x-P.x,r.y-P.y);
+    if(d<=3.4){ const sx=(r.x-ox)*TILE,sy=(r.y-oy)*TILE+28; drawRoamerIcon(MONSTERS[r.mi].n,sx,sy); } } }
+  drawPlayer((P.x-ox)*TILE,(P.y-oy)*TILE+28);
+}
+
+/* ===================== Museum interior (special) ===================== */
+const MUSEUM={cols:5};
+function renderMuseum(){
+  // marble hall
+  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1a2036');g.addColorStop(1,'#0c1020');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // floor checker
+  for(let y=0;y<H/24;y++)for(let x=0;x<W/24;x++){if((x+y)%2){ctx.fillStyle='rgba(255,255,255,.03)';ctx.fillRect(x*24,y*24+28,24,24);}}
+  // pillars
+  ctx.fillStyle='rgba(244,200,96,.10)';
+  for(let i=0;i<6;i++){ctx.fillRect(8+i*92,28,10,H-28);}
+  // exhibit pedestals laid in a grid; player walks among them
+  const pads=museumPads();
+  pads.forEach((p,i)=>{
+    const sel=(P.mi===i);
+    ctx.fillStyle=sel?'#f4c860':'#3a466a';
+    ctx.fillRect(p.sx,p.sy,40,40);
+    ctx.fillStyle='#10182c';ctx.fillRect(p.sx+5,p.sy+5,30,30);
+    const seen=G.exhibitsSeen[p.d.ex];
+    ctx.font='20px serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(seen?'🔎':'🏺',p.sx+20,p.sy+21);
+    ctx.fillStyle=sel?'#f4c860':'#9aa6cc';ctx.font='9px sans-serif';
+    ctx.fillText(p.d.name.slice(0,14),p.sx+20,p.sy+50);
+    ctx.fillStyle='#caa24a';ctx.font='8px sans-serif';ctx.fillText('🜚'+p.d.coin,p.sx+20,p.sy-5);
+  });
+  // caretaker desk
+  ctx.fillStyle='#caa24a';ctx.font='11px serif';ctx.textAlign='center';
+  ctx.fillText('▣ Caretaker  (talk: '+( G.questStage<MUSEUM_QUEST.length?'quest ready':'—')+')',W/2,H-12);
+  // player marker
+  const cur=pads[P.mi]; if(cur){ctx.strokeStyle='#f4c860';ctx.lineWidth=2;ctx.strokeRect(cur.sx-3,cur.sy-3,46,46);ctx.lineWidth=1;}
+}
+function museumPads(){
+  const pads=[];const cols=5, padW=88, padH=64, x0=24,y0=44;
+  MUSEUM_DISPLAYS.forEach((d,i)=>{const c=i%cols,r=(i/cols)|0;
+    pads.push({d,i,sx:x0+c*padW,sy:y0+r*padH});});
+  return pads;
+}
+
+/* ===================== Player cursor for interiors ===================== */
+let P={x:0,y:0,mi:0};
+let TOWN=null, DUN=null, currentTownId=null;
+
+/* ===================== UI: dialogue queue ===================== */
+let dq=[], dqCb=null, dlgOpen=false, typed='', typeTarget='', typeI=0, typeTimer=0;
+function say(lines, who, cb){
+  dq=(Array.isArray(lines)?lines:[lines]).slice();
+  dqCb=cb||null; dlgOpen=true; $('dlg').style.display='block';
+  $('dwho').textContent=who||''; nextLine();
+}
+function nextLine(){
+  if(dq.length===0){ $('dlg').style.display='none'; dlgOpen=false; const cb=dqCb;dqCb=null; if(cb)cb(); return;}
+  typeTarget=dq.shift(); typed='';typeI=0; $('dtxt').textContent='';
+}
+function tickType(dt){
+  if(!dlgOpen) return;
+  if(typeI<typeTarget.length){ typeTimer+=dt; while(typeTimer>12&&typeI<typeTarget.length){typed+=typeTarget[typeI++];typeTimer-=12;}
+    $('dtxt').textContent=typed; }
+}
+function advanceDlg(){
+  if(typeI<typeTarget.length){ typed=typeTarget;typeI=typeTarget.length;$('dtxt').textContent=typed; return; }
+  nextLine();
+}
+
+/* ===================== UI: menu ===================== */
+let menuOpen=false, menuSel=0, menuItems=[], menuCb=null, menuTitle='';
+function openMenu(title,items,cb){
+  menuTitle=title;menuItems=items;menuCb=cb;menuSel=0;menuOpen=true;
+  const el=$('menu');el.style.display='block';renderMenu();
+}
+function renderMenu(){
+  const el=$('menu');let h=`<h2>${menuTitle}</h2>`;
+  menuItems.forEach((it,i)=>{h+=`<div class="row" data-i="${i}" style="${i===menuSel?'background:rgba(244,200,96,.16);border-color:var(--gold)':''}">
+    <span>${it.label}</span><span class="sub">${it.sub||''}</span></div>`;});
+  h+=`<div class="closerow" data-i="-1">✕ Close (Esc)</div>`;
+  el.innerHTML=h;
+  el.querySelectorAll('[data-i]').forEach(r=>r.onclick=()=>{const i=+r.dataset.i; if(i<0){closeMenu();}else{menuSel=i;chooseMenu();}});
+}
+function chooseMenu(){const it=menuItems[menuSel];const cb=menuCb;closeMenu();if(it&&cb)cb(it,menuSel);}
+function closeMenu(){menuOpen=false;$('menu').style.display='none';}
+
+/* ===================== Toast & HUD ===================== */
+let toastT=0;
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');toastT=140;}
+function updateHUD(){
+  if(!G){$('hud').style.display='none';return;}
+  $('hud').style.display=G.scene==='title'?'none':'block';
+  $('hpfill').style.width=(100*G.hp/G.maxhp)+'%';
+  $('hptxt').textContent=G.hp+'/'+G.maxhp;
+  $('lvl').textContent=G.lvl;$('xp').textContent=G.xp;
+  $('gold').textContent=G.gold;$('coins').textContent=G.coins;
+  const names={overworld:'Tarmalon',town:currentTownId||'Town',dungeon:'Catacombs of Armak',museum:'Galactic Museum'};
+  $('loc').textContent=names[G.scene]||'Tarmalon';
+}
+
+/* ===================== Rewards / progression ===================== */
+function grant(item,c,msg){addItem(item,c);if(msg)toast(msg);}
+function setWeapon(w,d){G.weapon=w;G.wdmg=d;}
+function gainXP(n){G.xp+=n; while(G.xp>=G.xpnext){G.xp-=G.xpnext;G.lvl++;G.xpnext=Math.floor(G.xpnext*1.5);
+  G.maxhp+=8;G.hp=G.maxhp;G.str+=2;sfx('lvl');toast("Level up! Now Lv"+G.lvl);}}
+
+/* ===================== MAIN QUEST (Caretaker) ===================== */
+// Each stage: condition to advance + dialogue (authentic exhibit text where possible)
+const MUSEUM_QUEST=[
+  {who:"The Bracelet", text:[EXHIBITS[17]], after:()=>{G.flags.intro=true;}},
+  {who:"Museum Caretaker", text:[EXHIBITS[18]]},
+  {who:"Museum Caretaker", text:[EXHIBITS[19], EXHIBITS[30]], after:()=>{addItem('Museum Key',1);toast("Received Museum Key");G.flags.questStarted=true;}},
+  {who:"Museum Caretaker", text:[EXHIBITS[21]], need:()=>hasItem('Crown of Mancella'), wait:"Find the Scepter & Crown of Mancella. The dungeon and castle hold them."},
+  {who:"Museum Caretaker", text:[EXHIBITS[22]], need:()=>hasItem('Scepter of Mancella')&&hasItem('Crown of Mancella'),
+     after:()=>{addItem('Magic Ice',1);useItem('Crown of Mancella');useItem('Scepter of Mancella');toast("Received Magic Ice");}},
+  {who:"Museum Caretaker", text:[EXHIBITS[23],EXHIBITS[24],EXHIBITS[25]]},
+  {who:"Museum Caretaker", text:[EXHIBITS[28]], after:()=>{G.flags.huntJewels=true;}},
+  {who:"Museum Caretaker", text:[EXHIBITS[31]], need:()=>G.jewels>=4, wait:"Recover all 4 magic jewels from the dungeons of Tarmalon. ("+0+"/4)"},
+  {who:"Museum Caretaker", text:[EXHIBITS[33]], after:()=>{G.flags.won=true;}},
+];
+function talkCaretaker(){
+  const st=MUSEUM_QUEST[G.questStage];
+  if(!st){ say(["You have already saved Tarmalon, hero. Walk the museum as you please."],"Museum Caretaker"); return; }
+  if(st.need && !st.need()){
+    let w=st.wait;
+    if(G.questStage===7) w="Recover all 4 magic jewels from the dungeons of Tarmalon. ("+G.jewels+"/4)";
+    say([w],"Museum Caretaker"); return;
+  }
+  say(st.text, st.who, ()=>{ if(st.after)st.after(); G.questStage++;
+    if(G.flags.won){ winGame(); } });
+}
+
+/* ===================== Scenes: enter/leave ===================== */
+function enterMuseum(){G.scene='museum';P.mi=0;sfx('open');
+  if(!G.flags.intro){ talkCaretaker(); }
+  setHint("Arrows: move between exhibits · <kbd>Space</kbd> view exhibit · <kbd>T</kbd> talk to Caretaker · <kbd>Esc</kbd> leave");
+}
+function viewExhibit(){
+  const d=MUSEUM_DISPLAYS[P.mi];
+  if(G.coins<d.coin){ say(["You need "+d.coin+" museum coin"+(d.coin>1?'s':'')+" to view this exhibit. Find more gold in the world, then buy coins from town merchants."],"Exhibit"); return; }
+  G.coins-=d.coin; sfx('coin');
+  const first=!G.exhibitsSeen[d.ex]; G.exhibitsSeen[d.ex]=true;
+  say([EXHIBITS[d.ex]], d.name, ()=>{ if(first&&d.reward)d.reward(); });
+}
+function enterTown(id,name){G.scene='town';currentTownId=name;TOWN=buildTown();
+  P.x=TOWN.w>>1;P.y=TOWN.h-2;sfx('open');
+  setHint("Arrows: walk · enter a 🚪 shop or talk to ? NPCs · <kbd>Esc</kbd> leave town");}
+function enterDungeon(){G.scene='dungeon';DUN=buildDungeon();P.x=DUN.sx;P.y=DUN.sy;spawnDunRoamers();sfx('open');
+  say(["You descend into the twisting catacombs. Torchlight barely cuts the dark. Reach the stairs ↑ to escape — and grab any treasure ▣ you can."],"Catacombs of Armak");
+  setHint("Arrows: explore · ▣ open chest · ↑ stairs to leave · beware encounters");}
+function enterPirateLair(){G.scene='dungeon';DUN=buildPirateLair();P.x=DUN.sx;P.y=DUN.sy;spawnDunRoamers();sfx('open');
+  say([EXHIBITS[4]||"The pirate's lair has many levels. At the very bottom, it is said, lies a priceless SAPPHIRE!",
+       "You are transported to the largest of the Three Sisters. Sea-water seeps through the cavern walls. Somewhere in the deepest chamber lies the SAPPHIRE 💎."],"Pirate's Lair");
+  setHint("Arrows: explore the sea-cave · ▣ chests · 💎 the Sapphire · ↑ stairs out · water blocks your path");}
+function backToOverworld(){G.scene='overworld';dunRoamers=[];sfx('open');
+  if(owRoamers.length<4) spawnRoamers();
+  setHint(OW_HINT);}
+const OW_HINT="Arrows: travel · avoid or fight roaming monsters · <kbd>I</kbd> inventory · <kbd>M</kbd> quest · <kbd>Esc</kbd> save/menu";
+function setHint(h){$('chint').innerHTML=h;}
+
+/* ===================== Movement ===================== */
+function moveOW(dx,dy){
+  const nx=G.px+dx,ny=G.py+dy;
+  if(nx<0||ny<0||nx>=OWMAP.w||ny>=OWMAP.h)return;
+  const t=OWMAP.m[ny][nx];
+  if(!walkableOW(t)){ if(t===4)toast("The mountains are impassable."); else toast("The water is too rough to cross."); return;}
+  G.px=nx;G.py=ny;G.steps++;sfx('step');
+  const L=landmarkAt(nx,ny);
+  if(L){ enterLandmark(L); return; }
+  if(checkRoamerCollision(owRoamers)) return;      // walked into a monster
+  stepRoamers(owRoamers, owWalk);                   // monsters move
+  if(checkRoamerCollision(owRoamers)) return;       // a monster walked into us
+  if(owRoamers.length<6 && chance(0.04)) spawnRoamers(); // replenish
+  if((t===2||t===3||t===5)&&chance(0.015)) startBattle(); // rare ambush
+}
+function enterLandmark(L){
+  if(L.tile===7) enterMuseum();
+  else if(L.tile===8){ // town
+    enterTown(L.id,L.name);
+  } else if(L.tile===9){ if(L.id==='piratecave') enterPirateLair(); else enterDungeon(); }
+  else if(L.tile===10){ enterCastle(L); }
+}
+function enterCastle(L){
+  // Castle holds the Crown of Mancella (guarded). Simple set-piece.
+  if(hasItem('Crown of Mancella')||G.flags.castleDone){ say(["Kelfor Castle stands quiet. You have already claimed its treasure."],"Kelfor Castle"); return; }
+  say([
+    "You cross into Baron Kelfor's castle. Decoded from the original CASTLE map: ninety tiles wide, a maze of halls, gardens and hidden passages.",
+    "Castle guards bar the inner vault. They demand the four keys... but your Museum Key fits a hidden servant's door behind the gardens.",
+  ],"Kelfor Castle",()=>{
+    if(!hasItem('Museum Key')){ say(["The doors are locked. The Caretaker spoke of a key — return when you have it."],"Kelfor Castle"); return; }
+    // guard fight
+    startBattle(Object.assign({},MONSTERS[3],{n:"Castle Guard",hp:28}),()=>{
+      addItem('Crown of Mancella',1);G.flags.castleDone=true;sfx('win');
+      say(["Behind the gardens, in a spiral room, rests the jewelled CROWN OF MANCELLA. You take it for the Museum."],"Kelfor Castle");
+    });
+  });
+}
+function moveInterior(dx,dy){
+  const map=G.scene==='town'?TOWN:DUN;
+  const nx=P.x+dx,ny=P.y+dy;
+  if(nx<0||ny<0||nx>=map.w||ny>=map.h)return;
+  const t=map.m[ny][nx];
+  if(G.scene==='town'){
+    if(t===21){return;} // wall
+    if(t===22){ backToOverworld(); return; } // gate
+    if(t===23){ const d=map.doors.find(d=>d.x===nx&&d.y===ny); P.x=nx;P.y=ny; if(d)openShop(d.shop); return; }
+    P.x=nx;P.y=ny;sfx('step');
+    const npc=map.npcs.find(n=>n.x===nx&&n.y===ny); if(npc){giveHint();}
+  } else { // dungeon
+    if(t===31)return; // wall
+    if(t===36){ toast("Sea-water blocks the way."); return; } // water
+    P.x=nx;P.y=ny;G.steps++;sfx('step');
+    if(t===33){ // stairs up
+      const pir=DUN.theme==='pirate';
+      say([pir?"You climb back to the surface of the Three Sisters and sail for the mainland.":"You climb the stairs and emerge into daylight, tougher for the ordeal."],pir?"Pirate's Lair":"Catacombs of Armak",()=>{gainXP(20);backToOverworld();});
+      return;
+    }
+    if(t===34){ openChest(nx,ny); return; }
+    if(t===35){ takeSapphire(nx,ny); return; }
+    if(checkRoamerCollision(dunRoamers)) return;
+    stepRoamers(dunRoamers, dunWalk);
+    if(checkRoamerCollision(dunRoamers)) return;
+    if(chance(0.04)) startBattle(); // rare ambush in the dark
+  }
+}
+function openChest(x,y){
+  DUN.m[y][x]=30; sfx('coin');
+  // chest contents: gold, or a quest item (Scepter / a jewel)
+  if(!hasItem('Scepter of Mancella')&&!G.flags.gotScepter){ G.flags.gotScepter=true;addItem('Scepter of Mancella',1);
+    say(["Inside the chest: the jewelled SCEPTER OF MANCELLA! One of the Museum's lost treasures."],"Treasure!"); return; }
+  if(G.flags.huntJewels && G.jewels<4){ G.jewels++; const names=["Sapphire","Emerald","Ruby","Diamond"];
+    say(["You find one of the four magic jewels — the "+names[G.jewels-1]+"! ("+G.jewels+"/4 jewels)"],"Treasure!"); return; }
+  const g=20+rnd(40)+G.lvl*5; G.gold+=g; const herb=chance(.5);
+  if(herb)addItem('Healing Herb',1);
+  say(["The chest holds "+g+" gold"+(herb?" and a Healing Herb.":".")],"Treasure!");
+}
+
+function takeSapphire(x,y){
+  // guarded by a fierce bred beast, per the exhibit lore
+  startBattle(Object.assign({},MONSTERS[5],{n:"Pirate's Guard-Beast",hp:40,xp:60,gold:80}),()=>{
+    DUN.m[y][x]=30; sfx('win');
+    if(!hasItem('Sapphire')){ addItem('Sapphire',1); if(G.flags.huntJewels&&G.jewels<4)G.jewels++; }
+    say(["At the very bottom of the lair, behind the slain guardian, glitters the priceless SAPPHIRE — one of the four magic jewels! ("+G.jewels+"/4)"],"Treasure!");
+  });
+}
+
+/* ===================== Town shops ===================== */
+function openShop(shop){
+  if(shop.k==='healer'){
+    const cost=Math.max(5,(G.maxhp-G.hp)*2);
+    openMenu("Healer — "+ (G.hp<G.maxhp?("Restore HP for "+cost+" gold"):"You are at full health"),
+      [{label:"Heal fully",sub:cost+"g"},{label:"Buy Healing Herb",sub:"15g"},{label:"Buy climbing gear",sub:"40g"}],
+      (it,i)=>{ if(i===0){if(G.gold>=cost&&G.hp<G.maxhp){G.gold-=cost;G.hp=G.maxhp;sfx('heal');toast("Fully healed");}else toast("Cannot heal.");}
+        else if(i===1){if(G.gold>=15){G.gold-=15;addItem('Healing Herb');sfx('coin');toast("+1 Healing Herb");}else toast("Not enough gold");}
+        else if(i===2){if(G.gold>=40){G.gold-=40;addItem('Climbing Gear');sfx('coin');toast("Climbing gear acquired");}else toast("Not enough gold");} });
+  } else if(shop.k==='bank'){
+    openMenu("Lender & Bank",[{label:"Deposit 50 gold",sub:"safe from death"},{label:"Withdraw 50 gold"},{label:"Take a loan (+100g)",sub:"good rates"}],
+      (it,i)=>{ G.flags.bank=G.flags.bank||0;
+        if(i===0&&G.gold>=50){G.gold-=50;G.flags.bank+=50;toast("Deposited. Bank: "+G.flags.bank+"g");}
+        else if(i===1&&G.flags.bank>=50){G.flags.bank-=50;G.gold+=50;toast("Withdrew 50g");}
+        else if(i===2){G.gold+=100;toast("Loan: +100 gold");}
+        else toast("Not enough funds."); });
+  } else if(shop.k==='buyback'){
+    openMenu("Buyback Shop & Merchant",[{label:"Buy 1 Museum Coin",sub:"20g 🜚"},{label:"Buy 5 Museum Coins",sub:"90g 🜚"},{label:"Sell a Healing Herb",sub:"+8g"}],
+      (it,i)=>{ if(i===0){if(G.gold>=20){G.gold-=20;G.coins++;sfx('coin');toast("+1 coin");}else toast("Not enough gold");}
+        else if(i===1){if(G.gold>=90){G.gold-=90;G.coins+=5;sfx('coin');toast("+5 coins");}else toast("Not enough gold");}
+        else if(i===2){if(useItem('Healing Herb')){G.gold+=8;sfx('coin');toast("+8 gold");}else toast("No herbs to sell");} });
+  } else if(shop.k==='game'){
+    openMenu("Stones of Wisdom (gamble)",[{label:"Bet 10 gold",sub:"learn to lie..."},{label:"Bet 50 gold"}],
+      (it,i)=>{ const bet=i===0?10:50; if(G.gold<bet){toast("Not enough gold");return;}
+        const win=chance(0.4+G.intel*0.02); G.gold+= win?bet:-bet; sfx(win?'coin':'bad');
+        say([win?("You play flip-flop and WIN! +"+bet+" gold.") :("The stones fall against you. -"+bet+" gold.")],"Stones of Wisdom"); });
+  } else if(shop.k==='inn'){
+    openMenu("Inn",[{label:"Rest the night",sub:"10g — full heal"}],(it,i)=>{
+      if(G.gold>=10){G.gold-=10;G.hp=G.maxhp;sfx('heal');say(["You rest soundly and wake refreshed."],"Inn");}else toast("Not enough gold");});
+  }
+}
+let hintIdx=0;
+function giveHint(){ const h=HINTS[hintIdx%HINTS.length];hintIdx++; G.hintsSeen++;
+  say([h],"Townsperson"); }
+
+/* ===================== BATTLE ===================== */
+let B=null;
+function startBattle(forced,onWin){
+  const m=forced||monsterFor();
+  B={m, mhp:m.hp, onWin:onWin||null, log:"A "+m.n+" attacks!", turn:'player', def:false};
+  sfx('bad'); setTrack('battle');
+  G.scene_prev=G.scene; // remember
+  openBattleMenu();
+}
+function openBattleMenu(){
+  if(!B)return;
+  const weak=B.m.weak&&G.weapon===B.m.weak;
+  openMenu("⚔ "+B.m.n+"   (HP "+Math.max(0,B.mhp)+")",
+    [{label:"Attack with "+G.weapon, sub:weak?"effective!":""},
+     {label:"Use Healing Herb", sub:(G.inv['Healing Herb']||0)+" left"},
+     {label:"Defend", sub:"reduce damage"},
+     {label:"Flee", sub:""}],
+    (it,i)=>battleAction(i));
+}
+function battleAction(i){
+  if(!B)return; B.def=false;
+  if(i===0){ // attack
+    let dmg=G.str+G.wdmg+rnd(5);
+    if(B.m.weak&&G.weapon===B.m.weak) dmg=Math.floor(dmg*1.8);
+    B.mhp-=dmg; sfx('hit');
+    B.log="You strike the "+B.m.n+" for "+dmg+(B.m.weak===G.weapon?" (super effective!)":"")+".";
+  } else if(i===1){
+    if(useItem('Healing Herb')){const h=15+G.intel;G.hp=clamp(G.hp+h,0,G.maxhp);sfx('heal');B.log="You eat a Healing Herb (+"+h+" HP).";}
+    else {B.log="No Healing Herbs left!";}
+  } else if(i===2){ B.def=true;B.log="You raise your guard."; }
+  else if(i===3){ if(chance(0.55)){ toast("You flee!"); B=null; afterBattle(false); return;} else B.log="You failed to flee!"; }
+  // check monster dead
+  if(B.mhp<=0){ winBattle(); return; }
+  // monster turn
+  let md=B.m.atk+rnd(4)-(B.def?Math.floor(B.m.atk*0.6):0);
+  md=Math.max(1,md); G.hp-=md; sfx('hurt');
+  B.log+=" The "+B.m.n+" hits you for "+md+".";
+  if(G.hp<=0){ G.hp=0; gameOver(); return; }
+  // show round, then reopen menu
+  say([B.log],"Battle",()=>openBattleMenu());
+}
+function winBattle(){
+  gainXP(B.m.xp); G.gold+=B.m.gold; sfx('win');
+  const cb=B.onWin; const name=B.m.n; const xp=B.m.xp,gold=B.m.gold; B=null;
+  say(["You defeated the "+name+"!  +"+xp+" XP, +"+gold+" gold."],"Victory",()=>{ if(cb)cb(); afterBattle(true); });
+}
+function afterBattle(won){ setTrack(G.scene==='dungeon'?'theme':'theme'); }
+function gameOver(){
+  B=null; setTrack('theme');
+  say(["You have fallen. But the Museum's bracelet pulses with ancient power...",
+       "The Caretaker's magic draws your spirit back to the Galactic Museum. You lose half your gold, but your quest endures."],"Defeated",()=>{
+    G.gold=Math.floor(G.gold/2); G.hp=G.maxhp; G.scene='museum'; P.mi=0; setHint("");
+  });
+}
+function winGame(){
+  G.flags.won=true; sfx('win');
+  showEnding();
+}
+
+/* ===================== Input ===================== */
+const keys={};
+addEventListener('keydown',e=>{
+  if(G&&G.scene!=='title'){ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); }
+  if(dlgOpen){ if(e.key===' '||e.key==='Enter'){advanceDlg();} return; }
+  if(menuOpen){
+    if(e.key==='ArrowUp'){menuSel=(menuSel-1+menuItems.length)%menuItems.length;renderMenu();}
+    else if(e.key==='ArrowDown'){menuSel=(menuSel+1)%menuItems.length;renderMenu();}
+    else if(e.key==='Enter'||e.key===' '){chooseMenu();}
+    else if(e.key==='Escape'){ if(B){/* can't escape battle menu via esc */}else closeMenu(); }
+    return;
+  }
+  if(!G||G.scene==='title') return;
+  const k=e.key;
+  if(G.scene==='overworld'){
+    if(k==='ArrowUp')moveOW(0,-1);else if(k==='ArrowDown')moveOW(0,1);
+    else if(k==='ArrowLeft')moveOW(-1,0);else if(k==='ArrowRight')moveOW(1,0);
+    else if(k==='i'||k==='I')showInventory();
+    else if(k==='m'||k==='M')showQuestLog();
+    else if(k==='Escape')systemMenu();
+  } else if(G.scene==='town'||G.scene==='dungeon'){
+    if(k==='ArrowUp')moveInterior(0,-1);else if(k==='ArrowDown')moveInterior(0,1);
+    else if(k==='ArrowLeft')moveInterior(-1,0);else if(k==='ArrowRight')moveInterior(1,0);
+    else if(k==='Escape'){ if(G.scene==='town')backToOverworld(); else if(G.scene==='dungeon'){say(["You retreat to the surface."],"",()=>backToOverworld());} }
+    else if(k==='i'||k==='I')showInventory();
+  } else if(G.scene==='museum'){
+    const pads=museumPads(),cols=5;
+    if(k==='ArrowRight')P.mi=clamp(P.mi+1,0,pads.length-1);
+    else if(k==='ArrowLeft')P.mi=clamp(P.mi-1,0,pads.length-1);
+    else if(k==='ArrowDown')P.mi=clamp(P.mi+cols,0,pads.length-1);
+    else if(k==='ArrowUp')P.mi=clamp(P.mi-cols,0,pads.length-1);
+    else if(k===' '||k==='Enter')viewExhibit();
+    else if(k==='t'||k==='T')talkCaretaker();
+    else if(k==='Escape')backToOverworld();
+    else if(k==='i'||k==='I')showInventory();
+  }
+});
+function showInventory(){
+  const items=Object.keys(G.inv);
+  const list=items.length?items.map(n=>({label:n,sub:'×'+G.inv[n]})):[{label:"(empty)",sub:''}];
+  list.unshift({label:"— Weapon: "+G.weapon+" (dmg "+G.wdmg+")",sub:''});
+  list.unshift({label:"— STR "+G.str+"  CHA "+G.cha+"  INT "+G.intel,sub:''});
+  openMenu("Inventory & Stats",list,()=>{});
+}
+function showQuestLog(){
+  const stages=["Awaken in the Galactic Museum","Hear the Caretaker's plea","Recover the Crown & Scepter of Mancella",
+    "Return the treasures","Receive the Magic Ice","Learn of the warlord","Hunt the 4 magic jewels","Return the jewels","Tarmalon is saved"];
+  const cur=clamp(G.questStage,0,stages.length-1);
+  const list=stages.map((s,i)=>({label:(i<G.questStage?'✓ ':(i===cur?'➤ ':'· '))+s,sub:''}));
+  list.push({label:"Jewels: "+G.jewels+"/4   ·   Museum coins: "+G.coins,sub:''});
+  list.push({label:"Tip: "+pick(HINTS),sub:''});
+  openMenu("Quest — Neutralize the Wizards' Compendium",list,()=>{});
+}
+
+/* ===================== Ending ===================== */
+function showEnding(){
+  G.scene='ending';
+  $('hud').style.display='none';setHint("");
+}
+
+/* ===================== Title ===================== */
+let stars=[];
+function initStars(){stars=[];for(let i=0;i<120;i++)stars.push({x:Math.random()*W,y:Math.random()*H,z:Math.random()*2+.3});}
+initStars();
+// Authentic decoded castle-map ribbon, slowly scrolling as a parallax backdrop
+const CASTLE=CONTENT.castle_grid||[];
+function castleColor(v){ // categorical color from decoded tile id
+  if(v===0) return null;
+  const h=((v*0.61803398875)%1.0); const s=0.5,l=0.5;
+  // hsl->rgb quick
+  const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs(((h*6)%2)-1)), m=l-c/2;
+  let r,g,b; const hh=h*6;
+  if(hh<1){r=c;g=x;b=0}else if(hh<2){r=x;g=c;b=0}else if(hh<3){r=0;g=c;b=x}
+  else if(hh<4){r=0;g=x;b=c}else if(hh<5){r=x;g=0;b=c}else{r=c;g=0;b=x}
+  return `rgb(${(r+m)*180|0},${(g+m)*180|0},${(b+m)*200|0})`;
+}
+function renderTitle(){
+  ctx.fillStyle='#03040a';ctx.fillRect(0,0,W,H);
+  // decoded castle map drifting in the lower third (authentic recovered data)
+  if(CASTLE.length){
+    const ts=6, off=(wob*0.15)% (CASTLE[0].length*ts);
+    ctx.globalAlpha=0.18;
+    for(let y=0;y<CASTLE.length;y++)for(let x=0;x<CASTLE[y].length;x++){
+      const c=castleColor(CASTLE[y][x]); if(!c)continue;
+      ctx.fillStyle=c; ctx.fillRect(((x*ts-off)%(CASTLE[0].length*ts))+ (W-CASTLE[0].length*ts)/2, H-CASTLE.length*ts*0.7+y*ts*0.7, ts, ts*0.7);
+    }
+    ctx.globalAlpha=1;
+    ctx.fillStyle='rgba(3,4,10,0.55)';ctx.fillRect(0,0,W,H);
+  }
+  for(const s of stars){ctx.fillStyle=`rgba(180,200,255,${.3+s.z*.3})`;ctx.fillRect(s.x,s.y,s.z,s.z);
+    s.x-=s.z*0.3; if(s.x<0){s.x=W;s.y=Math.random()*H;}}
+  // planet Tarmalon
+  const cx=W*0.5,cy=H*0.42,r=70;
+  const g=ctx.createRadialGradient(cx-20,cy-20,10,cx,cy,r);
+  g.addColorStop(0,'#3a7fd0');g.addColorStop(.6,'#1d4a8a');g.addColorStop(1,'#0a1f45');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fill();
+  ctx.fillStyle='rgba(120,200,120,.5)';
+  for(let i=0;i<5;i++){ctx.beginPath();ctx.ellipse(cx+Math.sin(wob*0.01+i)*20-10,cy-20+i*16,18-i*2,5,0.3,0,7);ctx.fill();}
+  // ring
+  ctx.strokeStyle='rgba(244,200,96,.4)';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(cx,cy,r+24,16,0.5,0,7);ctx.stroke();ctx.lineWidth=1;
+}
+function renderEnding(){
+  ctx.fillStyle='#03040a';ctx.fillRect(0,0,W,H);
+  for(const s of stars){ctx.fillStyle=`rgba(244,220,160,${.3+s.z*.4})`;ctx.fillRect(s.x,s.y,s.z,s.z);s.y+=s.z*0.2;if(s.y>H)s.y=0;}
+  ctx.fillStyle='#f4c860';ctx.textAlign='center';ctx.font='bold 26px serif';
+  ctx.fillText('TARMALON IS SAVED',W/2,H*0.32);
+  ctx.fillStyle='#e8edff';ctx.font='13px sans-serif';
+  const lines=["The Wizards' Compendium is sealed by the four magic jewels.",
+    "The Galactic Medal of Honor gleams upon your chest.",
+    "","Lv "+G.lvl+"  ·  "+G.steps+" steps walked  ·  "+Object.keys(G.exhibitsSeen).length+" exhibits viewed",
+    "","Thank you for playing this reconstruction.","Press Space to return to the title."];
+  lines.forEach((l,i)=>ctx.fillText(l,W/2,H*0.45+i*20));
+}
+
+/* ===================== Boot / loop ===================== */
+let last=0;
+function loop(ts){
+  const dt=ts-last; last=ts;
+  if(!G||G.scene==='title') renderTitle();
+  else if(G.scene==='ending') renderEnding();
+  else render();
+  tickType(dt);
+  musicTick();
+  if(toastT>0){toastT-=dt; if(toastT<=0)$('toast').classList.remove('show');}
+  updateHUD(); updateTouchVisible();
+  requestAnimationFrame(loop);
+}
+function startGame(){
+  newGame(); G.scene='overworld'; $('title').style.display='none'; setHint(OW_HINT);
+  musicStart(); setTrack('theme'); spawnRoamers();
+  say([
+    "PLANET TARMALON. You wake at the gates of a Galactic Museum, an ancient gold bracelet on your wrist and a strange leather scroll in your pack.",
+    "A voice stirs in your mind. Enter the Museum 🏛 to the north-east to learn your purpose — or explore the lands of Tarmalon first.",
+  ],"Legacy of the Ancients");
+}
+$('btnNew').onclick=startGame;
+$('btnAbout').onclick=()=>{ if(!AC)musicStart(); say([
+  "This is a modern, playable reconstruction of Legacy of the Ancients (Electronic Arts, 1987).",
+  "Following the dos-decode-kit method, the original DOS files were cracked: BSAVE containers opened, tile-grid maps recovered (the castle, towns and dungeons), and the museum's exhibit text and town hints decoded byte-for-byte.",
+  "Every museum exhibit you read here is the ACTUAL text from the 1987 game data. The drifting map behind this title is the real decoded CASTLE map. The world, combat, shops and music are a faithful modern re-imagining of the original loop.",
+  "Honesty note: the title-screen bitmap (TITLE.GLB/GMP) is RLE-compressed — the 'graphics wall' the kit itself flags as the part that required the now-retired Fable model. It did not crack cleanly on Opus alone, so this title uses verified-correct decoded data (the castle map) rather than a wrong guess.",
+],"About");};
+$('titletag').innerHTML="Decoded from the original 1987 EA DOS files and rebuilt for the browser.<br>The museum exhibits you'll read — and the map drifting behind this title — are real decoded originals.";
+
+addEventListener('keydown',e=>{ if(G&&G.scene==='ending'&&e.key===' '){G=null;refreshTitle();$('title').style.display='flex';} });
+addEventListener('keydown',e=>{ if((e.key==='p'||e.key==='P')&&!dlgOpen&&!menuOpen){ if(!AC)musicStart(); musicToggle(); } });
+$('musbtn')&&($('musbtn').onclick=()=>{ if(!AC)musicStart(); musicToggle(); });
+// HUD + title + import bindings
+$('savebtn')&&($('savebtn').onclick=()=>{ if(G&&G.scene!=='title'&&G.scene!=='ending')saveGame(); });
+$('loadbtn')&&($('loadbtn').onclick=()=>{ loadGame(); });
+$('sysbtn')&&($('sysbtn').onclick=()=>{ if(G&&G.scene==='overworld')systemMenu(); });
+$('btnContinue')&&($('btnContinue').onclick=()=>{ loadGame(); });
+$('btnImport')&&($('btnImport').onclick=()=>importSave());
+$('fileimport')&&($('fileimport').onchange=e=>{ const f=e.target.files[0]; if(f)handleImport(f); e.target.value=''; });
+function refreshTitle(){ const c=$('btnContinue'); if(c) c.style.display=hasSave()?'inline-block':'none'; }
+refreshTitle();
+
+/* ===================== Touch controls (mobile) ===================== */
+let IS_TOUCH=false;
+try{ IS_TOUCH = ('ontouchstart' in window) || (typeof navigator!=='undefined' && navigator.maxTouchPoints>0)
+   || (window.matchMedia && window.matchMedia('(pointer:coarse)').matches); }catch(e){}
+function pressKey(k){ try{ window.dispatchEvent(new KeyboardEvent('keydown',{key:k,bubbles:true})); }catch(e){} }
+(function bindTouch(){
+  const root=$('touch'); if(!root||!root.querySelectorAll) return;
+  root.querySelectorAll('.tb').forEach(b=>{
+    const k=b.getAttribute&&b.getAttribute('data-k'); if(!k) return;
+    const down=ev=>{ ev.preventDefault(); if(!AC)musicStart();
+      if(dlgOpen){ advanceDlg(); } else { pressKey(k); }
+      b.classList.add('act'); };
+    const up=()=>b.classList.remove('act');
+    b.addEventListener&&b.addEventListener('pointerdown',down,{passive:false});
+    b.addEventListener&&b.addEventListener('pointerup',up);
+    b.addEventListener&&b.addEventListener('pointercancel',up);
+    b.addEventListener&&b.addEventListener('pointerleave',up);
+  });
+  const dlg=$('dlg'); dlg&&dlg.addEventListener&&dlg.addEventListener('pointerdown',ev=>{ if(dlgOpen){ev.preventDefault();advanceDlg();} });
+})();
+function updateTouchVisible(){
+  const t=$('touch'); if(!t) return;
+  let narrow=false; try{narrow=window.innerWidth<820;}catch(e){}
+  const show = G && G.scene!=='title' && G.scene!=='ending' && (IS_TOUCH||narrow);
+  t.style.display = show?'block':'none';
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
