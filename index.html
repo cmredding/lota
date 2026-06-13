@@ -14,6 +14,8 @@
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
     font-family:"Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden;}
   #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+  /* On portrait/tall screens, pin the game to the top so touch controls sit in the space below it */
+  @media (max-aspect-ratio: 3/2){ #wrap{align-items:flex-start;} }
   #stage{position:relative;width:min(100vw,calc(100vh*1.5));height:min(100vh,calc(100vw/1.5));
     background:#000;box-shadow:0 0 60px #000 inset, 0 0 80px rgba(0,0,0,.8);}
   canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:block;}
@@ -75,22 +77,22 @@
     box-shadow:0 0 140px rgba(0,0,0,.7) inset;}
   kbd{background:#1b2440;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;
     padding:1px 6px;font-size:.85em;color:var(--ink)}
-  /* Touch controls */
-  #touch{z-index:50;}
+  /* Touch controls — fixed to the whole screen so they sit below the game band on phones */
+  #touch{position:fixed;inset:0;z-index:80;pointer-events:none;}
   #touch .tb{pointer-events:auto;user-select:none;-webkit-user-select:none;touch-action:none;
     display:flex;align-items:center;justify-content:center;color:var(--ink);
     background:linear-gradient(180deg,rgba(40,52,86,.82),rgba(16,24,44,.82));
     border:1px solid var(--line);border-radius:12px;font-size:clamp(18px,3.4vh,26px);
     box-shadow:0 3px 10px rgba(0,0,0,.5);backdrop-filter:blur(2px);}
   #touch .tb.act{background:var(--gold);color:#1a1205;border-color:var(--gold);transform:scale(.94);}
-  .dpad{position:absolute;left:max(12px,2.5%);bottom:max(14px,3%);
-    display:grid;grid-template-columns:repeat(3,clamp(44px,9vh,62px));
-    grid-template-rows:repeat(3,clamp(44px,9vh,62px));gap:6px;
-    grid-template-areas:". up ." "left mid right" ". down .";opacity:.9;}
+  .dpad{position:absolute;left:max(14px,4%);bottom:calc(env(safe-area-inset-bottom,0px) + max(18px,3%));
+    display:grid;grid-template-columns:repeat(3,clamp(50px,15vw,68px));
+    grid-template-rows:repeat(3,clamp(50px,15vw,68px));gap:7px;
+    grid-template-areas:". up ." "left mid right" ". down .";opacity:.95;}
   .tb-up{grid-area:up}.tb-down{grid-area:down}.tb-left{grid-area:left}.tb-right{grid-area:right}
   .tb-mid{grid-area:mid;background:transparent!important;border:none!important;box-shadow:none!important;pointer-events:none!important;}
-  .acts{position:absolute;right:max(12px,2.5%);bottom:max(14px,3%);display:flex;flex-direction:column;
-    align-items:flex-end;gap:10px;opacity:.92;}
+  .acts{position:absolute;right:max(14px,4%);bottom:calc(env(safe-area-inset-bottom,0px) + max(18px,3%));display:flex;flex-direction:column;
+    align-items:flex-end;gap:12px;opacity:.95;}
   .abrow{display:flex;gap:12px;align-items:center;}
   .btnA{width:clamp(62px,12vh,84px);height:clamp(62px,12vh,84px);border-radius:50%!important;
     font-weight:800;color:var(--gold)!important;border-color:var(--gold2)!important;font-size:clamp(20px,3.6vh,28px)!important;}
@@ -144,32 +146,32 @@
     </div>
   </div>
 
-  <!-- Touch controls (mobile) -->
-  <div id="touch" class="layer" style="display:none">
-    <div class="dpad">
-      <div class="tb tb-up" data-k="ArrowUp">▲</div>
-      <div class="tb tb-left" data-k="ArrowLeft">◀</div>
-      <div class="tb tb-mid"></div>
-      <div class="tb tb-right" data-k="ArrowRight">▶</div>
-      <div class="tb tb-down" data-k="ArrowDown">▼</div>
-    </div>
-    <div class="acts">
-      <div class="minirow">
-        <div class="tb mini" data-k="i" title="Inventory">🎒</div>
-        <div class="tb mini" data-k="m" title="Quest">📜</div>
-        <div class="tb mini" data-k="Escape" title="Menu / Back">⚙</div>
-      </div>
-      <div class="abrow">
-        <div class="tb btnB" data-k="Escape">B</div>
-        <div class="tb btnA" data-k=" ">A</div>
-      </div>
-    </div>
-  </div>
-
   <div class="toast" id="toast"></div>
   <div class="center-hint" id="chint"></div>
   <div class="fade" id="fade"></div>
 </div></div>
+
+<!-- Touch controls (mobile) — fixed to the viewport, below the game band -->
+<div id="touch" style="display:none">
+  <div class="dpad">
+    <div class="tb tb-up" data-k="ArrowUp">▲</div>
+    <div class="tb tb-left" data-k="ArrowLeft">◀</div>
+    <div class="tb tb-mid"></div>
+    <div class="tb tb-right" data-k="ArrowRight">▶</div>
+    <div class="tb tb-down" data-k="ArrowDown">▼</div>
+  </div>
+  <div class="acts">
+    <div class="minirow">
+      <div class="tb mini" data-k="i" title="Inventory">🎒</div>
+      <div class="tb mini" data-k="m" title="Quest">📜</div>
+      <div class="tb mini" data-k="Escape" title="Menu / Back">⚙</div>
+    </div>
+    <div class="abrow">
+      <div class="tb btnB" data-k="Escape">B</div>
+      <div class="tb btnA" data-k=" ">A</div>
+    </div>
+  </div>
+</div>
 
 <script>
 /* ============================================================
