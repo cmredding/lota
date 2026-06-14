@@ -118,9 +118,9 @@
   <div class="layer" id="hud"><div class="hudbar">
     <div class="stat">❤ <div class="bar"><i id="hpfill"></i></div><span id="hptxt"></span></div>
     <div class="stat">⚔ Lv<b id="lvl">1</b></div>
-    <div class="stat">⭐<b id="xp">0</b></div>
+    <div class="stat" title="Food">🍖<b id="xp">0</b></div>
     <div class="stat">💰<b id="gold">0</b></div>
-    <div class="stat">🜚<b id="coins">0</b><span class="sub" style="color:var(--dim);font-size:.8em">coins</span></div>
+    <div class="stat" title="Museum coins" id="coins" style="font-size:.92em"></div>
     <div class="loc" id="loc">Tarmalon</div>
     <div class="stat" id="savebtn" title="Save game" style="cursor:pointer;font-size:1.05em;color:var(--good)">💾</div>
     <div class="stat" id="loadbtn" title="Load game" style="cursor:pointer;font-size:1.05em;color:var(--accent)">📂</div>
@@ -196,7 +196,9 @@ const CONTENT = {"museum": ["Eons ago, nomadic warriors roamed the planet Tarmal
 /* ===================== Canvas & helpers ===================== */
 "use strict";
 /* ===================== Canvas & helpers ===================== */
-const BUILD="v6 · mobile text fix";
+"use strict";
+/* ===================== Canvas & helpers ===================== */
+const BUILD="v7 · deeper gameplay";
 try{ console.log("Legacy of the Ancients — build "+BUILD); }catch(e){}
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 let W=cv.width, H=cv.height;
@@ -225,17 +227,46 @@ function newGame(){
   G={
     scene:'overworld',
     px:38, py:30, dir:0, // overworld pos
-    hp:40,maxhp:40, gold:30, coins:6, lvl:1, xp:0, xpnext:30,
-    str:6, cha:5, intel:5,
+    hp:40,maxhp:40, gold:30,
+    coins:{bronze:6, silver:0, gold:0}, // museum coin TYPES (gold only from dungeon bottoms)
+    lvl:1,
+    str:6, cha:5, intel:5, dex:5, end:5,
+    food:50, maxfood:80,
     inv:{}, // item -> count
     flags:{}, // quest flags
     exhibitsSeen:{}, hintsSeen:0,
     weapon:'Stone Knife', wdmg:4,
+    armor:'Cloth Tunic', adef:0,
+    spells:{}, // spell name -> charges
     questStage:0, jewels:0,
-    steps:0,
+    steps:0, mail:null, guards:{},
   };
   addItem('Healing Herb',2);
   G.flags.intro=false;
+}
+// ---- coin helpers (museum currency comes in bronze/silver/gold types) ----
+function addCoin(t,n=1){ G.coins[t]=(G.coins[t]||0)+n; }
+function hasCoin(t,n=1){ return (G.coins[t]||0)>=n; }
+function spendCoin(t,n=1){ if(hasCoin(t,n)){G.coins[t]-=n;return true;} return false; }
+const COIN_LABEL={bronze:'🟤',silver:'⚪',gold:'🟡'};
+// ---- quest-based leveling (no XP; you level at story/dungeon milestones) ----
+function levelUp(reason){
+  G.lvl++; G.maxhp+=10; G.hp=G.maxhp; G.str+=2; G.end+=1;
+  sfx('lvl'); toast("You reach Level "+G.lvl+(reason?" — "+reason:""));
+}
+// ---- food / hunger: depletes as you travel; starving costs HP ----
+function stepFood(){
+  if(G.steps % 3 === 0) G.food = Math.max(0, (G.food||0) - 1);
+  if(G.food<=0){
+    G.hp = Math.max(0, G.hp-1);
+    if(G.steps%4===0) toast("You are starving! Eat food.");
+    if(G.hp<=0 && !B){ gameOver(); }
+  } else if(G.food===6){ toast("Getting hungry…"); }
+}
+function eatFood(item){
+  const gain = item==='Rations'?25 : item==='Meat'?15 : item==='Juton Fruit'?20 : 0;
+  if(gain && useItem(item)){ G.food=Math.min(G.maxfood,G.food+gain); sfx('heal'); toast("Ate "+item+" (+"+gain+" food)"); return true; }
+  return false;
 }
 function addItem(n,c=1){G.inv[n]=(G.inv[n]||0)+c;}
 function hasItem(n){return (G.inv[n]||0)>0;}
@@ -252,15 +283,15 @@ const MUSEUM_DISPLAYS = [
   {name:"Staff of Sacrifice", ex:1, coin:2, reward:r=>{addItem('Bladed Staff',1);setWeapon('Bladed Staff',9);toast("Bladed Staff equipped!");}},
   {name:"Town of Thornberry", ex:2, coin:1, reward:r=>{}},
   {name:"Currency Room", ex:7, coin:1, reward:r=>{G.gold+=40;toast("+40 gold");}},
-  {name:"Pirate's Cave", ex:3, coin:2, reward:r=>{G.flags.knowPirate=true;}},
-  {name:"The Three Sisters", ex:4, coin:2, reward:r=>{G.flags.knowSapphire=true;}},
+  {name:"Pirate's Cave", ex:3, coin:1, ct:'silver', reward:r=>{G.flags.knowPirate=true;}},
+  {name:"The Three Sisters", ex:4, coin:1, ct:'silver', reward:r=>{G.flags.knowSapphire=true;}},
   {name:"Healing Herbs", ex:5, coin:1, reward:r=>{addItem('Juton Fruit',1);toast("Juton Fruit acquired");}},
   {name:"Flower Fountain", ex:6, coin:1, reward:r=>{G.flags.knowTulip=true;}},
   {name:"Stones of Wisdom", ex:8, coin:1, reward:r=>{G.intel+=1;toast("Intelligence +1");}},
   {name:"World Tapestry", ex:9, coin:1, reward:r=>{G.flags.haveMap=true;toast("World map revealed");}},
-  {name:"Catacombs of Armak", ex:10, coin:3, reward:r=>{G.flags.knowArmak=true;}},
-  {name:"Wizard of Arovyn", ex:13, coin:2, reward:r=>{G.flags.password=true;toast("Learned password: 'guardians'");}},
-  {name:"Frozen Pegasus", ex:14, coin:2, reward:r=>{G.flags.sawPegasus=true;}},
+  {name:"Catacombs of Armak", ex:10, coin:1, ct:'silver', reward:r=>{G.flags.knowArmak=true;}},
+  {name:"Wizard of Arovyn", ex:13, coin:1, ct:'gold', reward:r=>{G.flags.password=true;toast("Learned password: 'guardians'");}},
+  {name:"Frozen Pegasus", ex:14, coin:1, ct:'gold', reward:r=>{G.flags.sawPegasus=true;}},
 ];
 
 /* ===================== Sound (WebAudio, tiny) ===================== */
@@ -370,25 +401,35 @@ function walkableOW(t){return t!==0&&t!==1&&t!==4;} // water & mountains block; 
 /* ===================== Interiors ===================== */
 // Town: simple plaza with shop doors. Generated, polished look.
 const SHOPS=[
-  {k:'buyback',name:"Buyback Shop",color:'#caa24a',icon:'🛒'},
-  {k:'bank',name:"Lender & Bank",color:'#5cc6ff',icon:'🏦'},
-  {k:'healer',name:"Healer",color:'#7ee08a',icon:'➕'},
-  {k:'game',name:"Stones of Wisdom",color:'#c47aff',icon:'🎲'},
-  {k:'inn',name:"Inn",color:'#e0a06a',icon:'🛏'},
+  {k:'weapon',name:"Weaponsmith",icon:'⚔'},
+  {k:'armor',name:"Armorer",icon:'🛡'},
+  {k:'magic',name:"Magic Shop",icon:'✨'},
+  {k:'buyback',name:"Buyback Shop",icon:'🛒'},
+  {k:'bank',name:"Lender & Bank",icon:'🏦'},
+  {k:'healer',name:"Healer",icon:'➕'},
+  {k:'arcade',name:"Arcade",icon:'🎮'},
+  {k:'inn',name:"Inn",icon:'🛏'},
 ];
+// gear & magic tables
+const WEAPONS=[{n:'Stone Knife',dmg:4,cost:0},{n:'Flail',dmg:7,cost:60},{n:'Short Sword',dmg:10,cost:130},
+  {n:'Bladed Staff',dmg:12,cost:220},{n:'War Hammer',dmg:15,cost:360},{n:'Battle Axe',dmg:19,cost:560}];
+const ARMORS=[{n:'Cloth Tunic',def:0,cost:0},{n:'Leather Armor',def:2,cost:80},{n:'Chain Mail',def:4,cost:210},{n:'Plate Armor',def:7,cost:440}];
+const SPELLS=[{n:'Blast',cost:8,d:'damage one foe'},{n:'Fireblast',cost:15,d:'heavy damage'},
+  {n:'Befuddle',cost:10,d:'stun a foe'},{n:'Kill',cost:22,d:'slay a weaker foe'},
+  {n:'Strength',cost:12,d:'+attack this battle'},{n:'Museum',cost:18,d:'warp to the Museum'}];
 function buildTown(){
-  const w=22,h=14, m=Array.from({length:h},()=>Array(w).fill(20)); //20 floor
+  const w=26,h=15, m=Array.from({length:h},()=>Array(w).fill(20)); //20 floor
   for(let x=0;x<w;x++){m[0][x]=21;m[h-1][x]=21;}
   for(let y=0;y<h;y++){m[y][0]=21;m[y][w-1]=21;}
   m[h-1][w>>1]=22; // exit gate
   // fountain center
-  m[6][10]=24;m[6][11]=24;m[7][10]=24;m[7][11]=24;
-  // shop buildings along top
+  m[7][12]=24;m[7][13]=24;m[8][12]=24;m[8][13]=24;
+  // shop buildings along the top row
   const doors=[];
-  const xs=[3,6,9,12,15,18];
-  SHOPS.forEach((s,i)=>{const x=xs[i]||3; m[2][x]=23; doors.push({x,y:2,shop:s});});
-  // a few NPCs
-  const npcs=[{x:4,y:9},{x:16,y:10},{x:11,y:11}];
+  const xs=[2,5,8,11,14,17,20,23];
+  SHOPS.forEach((s,i)=>{const x=xs[i%xs.length]; m[2][x]=23; doors.push({x,y:2,shop:s});});
+  // a few hint NPCs
+  const npcs=[{x:4,y:11},{x:20,y:12},{x:13,y:12}];
   return {w,h,m,doors,npcs};
 }
 
@@ -439,18 +480,28 @@ function buildPirateLair(){
 }
 
 /* ===================== Monsters ===================== */
+// Authentic Tarmalon roster (ordered roughly by difficulty). food:true → corpse yields meat.
 const MONSTERS=[
-  {n:"Slash Nettle",hp:10,atk:3,xp:8,gold:6,weak:'Stone Knife'},
-  {n:"Sea Swallow",hp:14,atk:5,xp:12,gold:10},
-  {n:"Maston Leaper",hp:20,atk:7,xp:20,gold:16,weak:'Bladed Staff'},
-  {n:"Warlord's Agent",hp:24,atk:9,xp:26,gold:24},
-  {n:"Neural Cloud",hp:30,atk:11,xp:36,gold:30,weak:'Bladed Staff'},
-  {n:"Cave Marauder",hp:34,atk:13,xp:44,gold:40},
+  {n:"Slash Nettle",hp:10,atk:3,gold:6,weak:'Stone Knife',food:true},
+  {n:"Pulp Crawler",hp:13,atk:4,gold:8,food:true},
+  {n:"Blistopod",hp:16,atk:5,gold:10,food:true},
+  {n:"Sea Swallow",hp:18,atk:6,gold:12,weak:'Flail',food:true},
+  {n:"Scorpod",hp:22,atk:8,gold:16},
+  {n:"Maston Leaper",hp:26,atk:9,gold:20,weak:'Bladed Staff'},
+  {n:"Bone Dweller",hp:30,atk:10,gold:24},
+  {n:"Ventro Flailer",hp:34,atk:12,gold:28},
+  {n:"Warlord's Agent",hp:38,atk:13,gold:34,coin:'silver'},
+  {n:"Carrion Mangler",hp:42,atk:15,gold:40,food:true},
+  {n:"Neural Cloud",hp:48,atk:17,gold:46,weak:'Bladed Staff'},
+  {n:"Pit Stalker",hp:54,atk:19,gold:54},
+  {n:"Venom Floater",hp:60,atk:21,gold:60},
+  {n:"Wind Stalker",hp:66,atk:24,gold:70},
+  {n:"Cave Marauder",hp:72,atk:27,gold:84,coin:'silver'},
 ];
 function monsterFor(){
-  let tier = G.scene==='dungeon'?2:0;
-  tier += Math.min(3, Math.floor(G.lvl/2));
-  const lo=clamp(tier-1,0,MONSTERS.length-1), hi=clamp(tier+1,0,MONSTERS.length-1);
+  let base = G.scene==='dungeon' ? ((DUN&&DUN.theme==='pirate')?6:4) : 0;
+  base += Math.floor((G.lvl-1)*1.2);
+  const lo=clamp(base-2,0,MONSTERS.length-1), hi=clamp(base+2,0,MONSTERS.length-1);
   return Object.assign({},MONSTERS[lo+rnd(hi-lo+1)]);
 }
 
@@ -498,9 +549,17 @@ function drawCreature(name, cx, cy, s, t){
     ctx.fillStyle='#5a6a8a';ctx.fillRect(cx-s*0.45,cy-s*0.5,s*0.9,s*1.2);
     ctx.fillStyle='#c0c8e0';ctx.beginPath();ctx.arc(cx,cy-s*0.55,s*0.3,0,7);ctx.fill();
     ctx.fillStyle='#caa24a';ctx.fillRect(cx+s*0.4,cy-s*0.9,s*0.12,s*1.5); // spear
-  } else { // default blob
-    ctx.fillStyle='#9a5ad0';ctx.beginPath();ctx.arc(cx,cy,s*0.7,0,7);ctx.fill();
-    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx-s*0.2,cy-s*0.1,s*0.12,0,7);ctx.arc(cx+s*0.2,cy-s*0.1,s*0.12,0,7);ctx.fill();
+  } else { // default creature — color varies by name so the roster looks distinct
+    let hsh=0; for(let i=0;i<name.length;i++) hsh=(hsh*31+name.charCodeAt(i))&255;
+    const hue=hsh/255, c=0.6,l=0.5, hh=hue*6, X=c*(1-Math.abs(hh%2-1));
+    let r,gg,b; if(hh<1){r=c;gg=X;b=0}else if(hh<2){r=X;gg=c;b=0}else if(hh<3){r=0;gg=c;b=X}else if(hh<4){r=0;gg=X;b=c}else if(hh<5){r=X;gg=0;b=c}else{r=c;gg=0;b=X}
+    const m=l-c/2;
+    ctx.fillStyle=`rgb(${(r+m)*255|0},${(gg+m)*255|0},${(b+m)*255|0})`;
+    ctx.beginPath();ctx.ellipse(cx,cy,s*0.7,s*0.62,0,0,7);ctx.fill();
+    // spikes for menace
+    ctx.fillStyle='rgba(0,0,0,.35)';for(let a=0;a<6;a++){const an=a/6*6.283;ctx.beginPath();ctx.moveTo(cx+Math.cos(an)*s*0.6,cy+Math.sin(an)*s*0.55);ctx.lineTo(cx+Math.cos(an)*s*0.85,cy+Math.sin(an)*s*0.8);ctx.lineTo(cx+Math.cos(an+0.3)*s*0.6,cy+Math.sin(an+0.3)*s*0.55);ctx.fill();}
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx-s*0.22,cy-s*0.08,s*0.13,0,7);ctx.arc(cx+s*0.22,cy-s*0.08,s*0.13,0,7);ctx.fill();
+    ctx.fillStyle='#111';ctx.beginPath();ctx.arc(cx-s*0.22,cy-s*0.06,s*0.06,0,7);ctx.arc(cx+s*0.22,cy-s*0.06,s*0.06,0,7);ctx.fill();
   }
   ctx.restore();
 }
@@ -510,7 +569,7 @@ function drawRoamerIcon(name,sx,sy){ drawCreature(name, sx+TILE/2, sy+TILE/2-2, 
 /* ===================== Roaming monsters ===================== */
 let owRoamers=[], dunRoamers=[];
 function isWild(t){return t===2||t===3||t===5;}
-function tierIndex(){ return clamp(Math.floor(G.lvl/2),0,MONSTERS.length-1); }
+function tierIndex(){ return clamp(Math.floor((G.lvl-1)*1.2),0,MONSTERS.length-1); }
 function randMonsterIdx(base){ const t=base!=null?base:tierIndex(); const lo=clamp(t-1,0,MONSTERS.length-1),hi=clamp(t+1,0,MONSTERS.length-1); return lo+rnd(hi-lo+1); }
 function spawnRoamers(){
   owRoamers=[]; dunRoamers=[];
@@ -565,7 +624,7 @@ function restoreFrom(o){
   if(!AC)musicStart(); setTrack('theme'); B=null; closeMenu();
   const sc=G.scene;
   if(sc==='town'){ TOWN=buildTown(); P.x=TOWN.w>>1; P.y=TOWN.h-2; }
-  else if(sc==='dungeon'){ G.scene='overworld'; toast('Returned to overworld'); } // safest
+  else if(sc==='dungeon'||sc==='fps'||sc==='stadium'){ G.scene='overworld'; toast('Returned to overworld'); } // safest
   else if(sc==='museum'){ P.mi=0; }
   if(G.scene==='overworld') setHint(OW_HINT);
   spawnRoamers(); spawnDunRoamers();
@@ -667,6 +726,8 @@ function render(){
   wob++;
   ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
   if(B){ renderBattle(); return; }
+  if(G&&G.scene==='stadium'){ sdRender(); return; }
+  if(G&&G.scene==='fps'){ renderFPS(); return; }
   if(G&&(G.scene==='overworld')) renderGrid(OWMAP,G.px,G.py);
   else if(G&&G.scene==='town') renderInterior(TOWN);
   else if(G&&G.scene==='dungeon') renderInterior(DUN,true);
@@ -737,6 +798,82 @@ function renderInterior(map,dark){
   drawPlayer((P.x-ox)*TILE,(P.y-oy)*TILE+28);
 }
 
+/* ===================== First-person dungeon (raycaster) ===================== */
+function fpsWall(t){ return t===undefined||t===31||t===36; }
+function cellAhead(){
+  const dv=[[0,-1],[1,0],[0,1],[-1,0]][G.dir];
+  const x=P.x+dv[0],y=P.y+dv[1]; const t=(DUN.m[y]||[])[x];
+  if(t===33)return '↑ Stairs — step forward to climb out';
+  if(t===34)return '▣ Chest ahead — step forward';
+  if(t===35)return '💎 The Sapphire — step forward!';
+  if(t===36)return '≈ Water blocks the way';
+  if(fpsWall(t))return 'Wall ahead';
+  return '';
+}
+function renderFPS(){
+  const pir=DUN.theme==='pirate';
+  // ceiling & floor
+  ctx.fillStyle=pir?'#0a1420':'#0a0812'; ctx.fillRect(0,0,W,H/2);
+  ctx.fillStyle=pir?'#10202c':'#161019'; ctx.fillRect(0,H/2,W,H/2);
+  const posX=P.x+0.5, posY=P.y+0.5;
+  const dv=[[0,-1],[1,0],[0,1],[-1,0]][G.dir];
+  const dirX=dv[0], dirY=dv[1];
+  const planeX=-dirY*0.66, planeY=dirX*0.66;
+  const cols=Math.floor(W/2), colw=W/cols;
+  const zbuf=new Array(cols);
+  for(let c=0;c<cols;c++){
+    const camX=2*c/cols-1;
+    let rdx=dirX+planeX*camX||1e-6, rdy=dirY+planeY*camX||1e-6;
+    let mapX=Math.floor(posX), mapY=Math.floor(posY);
+    const ddx=Math.abs(1/rdx), ddy=Math.abs(1/rdy);
+    let stepX,stepY,sdx,sdy;
+    if(rdx<0){stepX=-1;sdx=(posX-mapX)*ddx;}else{stepX=1;sdx=(mapX+1-posX)*ddx;}
+    if(rdy<0){stepY=-1;sdy=(posY-mapY)*ddy;}else{stepY=1;sdy=(mapY+1-posY)*ddy;}
+    let hit=0,side=0,tile=31,g=0;
+    while(!hit && g++<48){
+      if(sdx<sdy){sdx+=ddx;mapX+=stepX;side=0;}else{sdy+=ddy;mapY+=stepY;side=1;}
+      const row=DUN.m[mapY]; tile=row?row[mapX]:31;
+      if(fpsWall(tile)) hit=1;
+    }
+    let dist=(side===0?sdx-ddx:sdy-ddy); if(dist<0.0001)dist=0.0001; zbuf[c]=dist;
+    const lh=Math.min(H*3, H/dist);
+    const y0=Math.floor(H/2-lh/2), y1=Math.floor(H/2+lh/2);
+    const baseCol = tile===36?[40,95,165] : (pir?[125,95,68]:[96,86,112]);
+    const sh=(side===1?0.68:1)*Math.max(0.22,1-dist/13);
+    ctx.fillStyle=`rgb(${baseCol[0]*sh|0},${baseCol[1]*sh|0},${baseCol[2]*sh|0})`;
+    ctx.fillRect(Math.floor(c*colw),y0,Math.ceil(colw)+1,y1-y0);
+  }
+  // sprites: special tiles + roaming monsters
+  const sprites=[];
+  for(let y=Math.max(0,P.y-9);y<Math.min(DUN.h,P.y+10);y++)for(let x=Math.max(0,P.x-9);x<Math.min(DUN.w,P.x+10);x++){
+    const t=DUN.m[y][x]; if(t===33||t===34||t===35) sprites.push({x:x+0.5,y:y+0.5,t});
+  }
+  for(const r of dunRoamers) sprites.push({x:r.x+0.5,y:r.y+0.5,mon:MONSTERS[r.mi].n});
+  sprites.forEach(s=>s.d=(s.x-posX)**2+(s.y-posY)**2); sprites.sort((a,b)=>b.d-a.d);
+  const invDet=1/(planeX*dirY-dirX*planeY);
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  for(const s of sprites){
+    const rx=s.x-posX, ry=s.y-posY;
+    const tx=invDet*(dirY*rx-dirX*ry);
+    const ty=invDet*(-planeY*rx+planeX*ry);
+    if(ty<=0.25) continue;
+    const screenX=(W/2)*(1+tx/ty);
+    const size=Math.min(H*0.9, (H/ty)*0.5);
+    const col=Math.floor(screenX/colw);
+    if(col<0||col>=cols) continue;
+    if(ty>zbuf[col]+0.2) continue; // behind a wall
+    const yc=H/2+(H/ty)*0.16;
+    if(s.mon){ drawCreature(s.mon, screenX, yc, Math.max(8,size*0.4), wob); }
+    else { ctx.font=Math.max(14,size*0.7)+'px serif'; ctx.fillText(s.t===33?'⬆️':s.t===34?'🧰':'💎', screenX, yc); }
+  }
+  ctx.textBaseline='alphabetic';
+  // top HUD strip
+  ctx.fillStyle='rgba(7,9,18,.82)';ctx.fillRect(0,0,W,22);
+  ctx.fillStyle='#caa24a';ctx.font='12px sans-serif';ctx.textAlign='left';
+  ctx.fillText(['N','E','S','W'][G.dir]+' · '+(pir?"Pirate's Lair":"Catacombs of Armak"),8,15);
+  const ah=cellAhead(); if(ah){ ctx.fillStyle='#5cc6ff';ctx.textAlign='right';ctx.fillText(ah,W-8,15); }
+}
+
 /* ===================== Museum interior (special) ===================== */
 const MUSEUM={cols:5};
 function renderMuseum(){
@@ -760,7 +897,7 @@ function renderMuseum(){
     ctx.fillText(seen?'🔎':'🏺',p.sx+20,p.sy+21);
     ctx.fillStyle=sel?'#f4c860':'#9aa6cc';ctx.font='9px sans-serif';
     ctx.fillText(p.d.name.slice(0,14),p.sx+20,p.sy+50);
-    ctx.fillStyle='#caa24a';ctx.font='8px sans-serif';ctx.fillText('🜚'+p.d.coin,p.sx+20,p.sy-5);
+    ctx.fillStyle='#caa24a';ctx.font='8px sans-serif';ctx.fillText(COIN_LABEL[p.d.ct||'bronze']+p.d.coin,p.sx+20,p.sy-5);
   });
   // caretaker desk
   ctx.fillStyle='#caa24a';ctx.font='11px serif';ctx.textAlign='center';
@@ -826,17 +963,19 @@ function updateHUD(){
   $('hud').style.display=G.scene==='title'?'none':'block';
   $('hpfill').style.width=(100*G.hp/G.maxhp)+'%';
   $('hptxt').textContent=G.hp+'/'+G.maxhp;
-  $('lvl').textContent=G.lvl;$('xp').textContent=G.xp;
-  $('gold').textContent=G.gold;$('coins').textContent=G.coins;
-  const names={overworld:'Tarmalon',town:currentTownId||'Town',dungeon:'Catacombs of Armak',museum:'Galactic Museum'};
+  $('lvl').textContent=G.lvl;
+  $('xp').textContent=Math.max(0,G.food|0); // repurposed: food
+  $('gold').textContent=G.gold;
+  $('coins').textContent=COIN_LABEL.bronze+(G.coins.bronze||0)+' '+COIN_LABEL.silver+(G.coins.silver||0)+' '+COIN_LABEL.gold+(G.coins.gold||0);
+  const names={overworld:'Tarmalon',town:currentTownId||'Town',dungeon:(DUN&&DUN.theme==='pirate')?"Pirate's Lair":'Catacombs of Armak',fps:(DUN&&DUN.theme==='pirate')?"Pirate's Lair":'Dungeon',museum:'Galactic Museum'};
   $('loc').textContent=names[G.scene]||'Tarmalon';
 }
 
 /* ===================== Rewards / progression ===================== */
 function grant(item,c,msg){addItem(item,c);if(msg)toast(msg);}
 function setWeapon(w,d){G.weapon=w;G.wdmg=d;}
-function gainXP(n){G.xp+=n; while(G.xp>=G.xpnext){G.xp-=G.xpnext;G.lvl++;G.xpnext=Math.floor(G.xpnext*1.5);
-  G.maxhp+=8;G.hp=G.maxhp;G.str+=2;sfx('lvl');toast("Level up! Now Lv"+G.lvl);}}
+// quest-based leveling only (no XP); milestone helper grants a level once per key
+function milestone(key,reason){ if(!G.flags['lvl_'+key]){ G.flags['lvl_'+key]=true; levelUp(reason); } }
 
 /* ===================== MAIN QUEST (Caretaker) ===================== */
 // Each stage: condition to advance + dialogue (authentic exhibit text where possible)
@@ -870,22 +1009,43 @@ function enterMuseum(){G.scene='museum';P.mi=0;sfx('open');
   setHint("Arrows: move between exhibits · <kbd>Space</kbd> view exhibit · <kbd>T</kbd> talk to Caretaker · <kbd>Esc</kbd> leave");
 }
 function viewExhibit(){
-  const d=MUSEUM_DISPLAYS[P.mi];
-  if(G.coins<d.coin){ say(["You need "+d.coin+" museum coin"+(d.coin>1?'s':'')+" to view this exhibit. Find more gold in the world, then buy coins from town merchants."],"Exhibit"); return; }
-  G.coins-=d.coin; sfx('coin');
+  const d=MUSEUM_DISPLAYS[P.mi]; const ct=d.ct||'bronze';
+  if(!hasCoin(ct,d.coin)){
+    const where = ct==='gold' ? "Gold coins are only found at the bottom of dungeons." : ct==='silver' ? "Silver coins drop from tougher foes and the Buyback Shop." : "Bronze coins come from traders and the Buyback Shop.";
+    say(["This display needs "+d.coin+" "+ct+" coin"+(d.coin>1?'s':'')+" "+COIN_LABEL[ct]+". "+where],"Exhibit"); return;
+  }
+  spendCoin(ct,d.coin); sfx('coin');
   const first=!G.exhibitsSeen[d.ex]; G.exhibitsSeen[d.ex]=true;
   say([EXHIBITS[d.ex]], d.name, ()=>{ if(first&&d.reward)d.reward(); });
 }
-function enterTown(id,name){G.scene='town';currentTownId=name;TOWN=buildTown();
+function enterTown(id,name){G.scene='town';currentTownId=name;currentTownId_id=id;TOWN=buildTown();
   P.x=TOWN.w>>1;P.y=TOWN.h-2;sfx('open');
-  setHint("Arrows: walk · enter a 🚪 shop or talk to ? NPCs · <kbd>Esc</kbd> leave town");}
-function enterDungeon(){G.scene='dungeon';DUN=buildDungeon();P.x=DUN.sx;P.y=DUN.sy;spawnDunRoamers();sfx('open');
-  say(["You descend into the twisting catacombs. Torchlight barely cuts the dark. Reach the stairs ↑ to escape — and grab any treasure ▣ you can."],"Catacombs of Armak");
-  setHint("Arrows: explore · ▣ open chest · ↑ stairs to leave · beware encounters");}
-function enterPirateLair(){G.scene='dungeon';DUN=buildPirateLair();P.x=DUN.sx;P.y=DUN.sy;spawnDunRoamers();sfx('open');
-  say([EXHIBITS[4]||"The pirate's lair has many levels. At the very bottom, it is said, lies a priceless SAPPHIRE!",
-       "You are transported to the largest of the Three Sisters. Sea-water seeps through the cavern walls. Somewhere in the deepest chamber lies the SAPPHIRE 💎."],"Pirate's Lair");
-  setHint("Arrows: explore the sea-cave · ▣ chests · 💎 the Sapphire · ↑ stairs out · water blocks your path");}
+  setHint("Arrows: walk · enter a 🚪 shop or talk to ? NPCs · <kbd>Esc</kbd> leave town");
+  // entering a different town clears guard memory of the others
+  for(const t in G.guards){ if(t!==id) delete G.guards[t]; }
+  // mail delivery
+  if(G.mail && G.mail.toId===id){ const r=G.mail.reward; G.gold+=r; const from=G.mail.fromName; G.mail=null; sfx('coin');
+    setTimeout(()=>say(["You deliver the letter from "+from+". The recipient pays you "+r+" gold. Thanks, courier!"],"Mail Delivered"),60); return; }
+  // guards remember a robbery here
+  if(G.guards[id]){ setTimeout(()=>say(["The guards of "+name+" recognize you from the bank robbery!"],"Wanted!",()=>{ startBattle(Object.assign({},MONSTERS[8],{n:"Town Guard",hp:36})); }),60); }
+}
+let currentTownId_id=null;
+function faceOpen(){ // pick an initial facing that has open floor
+  const dv=[[0,-1],[1,0],[0,1],[-1,0]];
+  for(let d=0;d<4;d++){const x=P.x+dv[d][0],y=P.y+dv[d][1]; if(DUN.m[y]&&DUN.m[y][x]===30){G.dir=d;return;}} G.dir=1;
+}
+function enterDungeon(){G.scene='fps';DUN=buildDungeon();P.x=DUN.sx;P.y=DUN.sy;faceOpen();spawnDunRoamers();sfx('open');
+  say(["You descend into the twisting catacombs of Armak. Torchlight gutters against the close stone walls. Find the stairs ↑ to climb out — and grab any treasure you can."],"Catacombs of Armak");
+  setHint("D-pad: ▲ forward · ◀ ▶ turn · ▼ back · explore in first person · <kbd>Esc</kbd> retreat");}
+function enterPirateLair(){G.scene='fps';DUN=buildPirateLair();P.x=DUN.sx;P.y=DUN.sy;faceOpen();spawnDunRoamers();sfx('open');
+  say([EXHIBITS[4]||"The pirate's lair has many levels. At the very bottom lies a priceless SAPPHIRE!",
+       "You arrive on the largest of the Three Sisters. Sea-water seeps through the cavern walls. Somewhere in the deepest chamber lies the SAPPHIRE."],"Pirate's Lair");
+  setHint("D-pad: ▲ forward · ◀ ▶ turn · ▼ back · find the Sapphire · <kbd>Esc</kbd> retreat");}
+// First-person movement: step in the faced direction (reuses dungeon tile handlers)
+function fpsForward(sign){
+  const dv=[[0,-1],[1,0],[0,1],[-1,0]][G.dir];
+  moveInterior(dv[0]*sign, dv[1]*sign);
+}
 function backToOverworld(){G.scene='overworld';dunRoamers=[];sfx('open');
   if(owRoamers.length<4) spawnRoamers();
   setHint(OW_HINT);}
@@ -898,14 +1058,25 @@ function moveOW(dx,dy){
   if(nx<0||ny<0||nx>=OWMAP.w||ny>=OWMAP.h)return;
   const t=OWMAP.m[ny][nx];
   if(!walkableOW(t)){ if(t===4)toast("The mountains are impassable."); else toast("The water is too rough to cross."); return;}
-  G.px=nx;G.py=ny;G.steps++;sfx('step');
+  G.px=nx;G.py=ny;G.steps++;sfx('step');stepFood();
   const L=landmarkAt(nx,ny);
   if(L){ enterLandmark(L); return; }
   if(checkRoamerCollision(owRoamers)) return;      // walked into a monster
   stepRoamers(owRoamers, owWalk);                   // monsters move
   if(checkRoamerCollision(owRoamers)) return;       // a monster walked into us
   if(owRoamers.length<6 && chance(0.04)) spawnRoamers(); // replenish
-  if((t===2||t===3||t===5)&&chance(0.015)) startBattle(); // rare ambush
+  if((t===2||t===3||t===5)&&chance(0.02)) meetTrader();   // friendly encounter
+  else if((t===2||t===3||t===5)&&chance(0.015)) startBattle(); // rare ambush
+}
+function meetTrader(){
+  const who=pick(['a wandering farmer','a roadside bandit','a traveling merchant']);
+  const opts=[
+    {label:"Buy Rations (3)",sub:"15g",act:()=>{ if(buy(15)){addItem('Rations',3);toast("+3 Rations");} }},
+    {label:"Buy a bronze coin",sub:"18g",act:()=>{ if(buy(18)){addCoin('bronze',1);toast("+1 bronze coin");} }},
+    {label:"Buy a Healing Herb",sub:"14g",act:()=>{ if(buy(14)){addItem('Healing Herb');toast("+1 Healing Herb");} }},
+    {label:"Move along",sub:"",act:()=>{}},
+  ];
+  openMenu("You meet "+who+".", opts, (it,i)=>{ opts[i].act&&opts[i].act(); });
 }
 function enterLandmark(L){
   if(L.tile===7) enterMuseum();
@@ -943,10 +1114,10 @@ function moveInterior(dx,dy){
   } else { // dungeon
     if(t===31)return; // wall
     if(t===36){ toast("Sea-water blocks the way."); return; } // water
-    P.x=nx;P.y=ny;G.steps++;sfx('step');
+    P.x=nx;P.y=ny;G.steps++;sfx('step');stepFood();
     if(t===33){ // stairs up
       const pir=DUN.theme==='pirate';
-      say([pir?"You climb back to the surface of the Three Sisters and sail for the mainland.":"You climb the stairs and emerge into daylight, tougher for the ordeal."],pir?"Pirate's Lair":"Catacombs of Armak",()=>{gainXP(20);backToOverworld();});
+      say([pir?"You climb back to the surface of the Three Sisters and sail for the mainland.":"You climb the stairs and emerge into daylight, tougher for the ordeal."],pir?"Pirate's Lair":"Catacombs of Armak",()=>{milestone(pir?'pirate':'armak','dungeon survived');backToOverworld();});
       return;
     }
     if(t===34){ openChest(nx,ny); return; }
@@ -964,60 +1135,178 @@ function openChest(x,y){
     say(["Inside the chest: the jewelled SCEPTER OF MANCELLA! One of the Museum's lost treasures."],"Treasure!"); return; }
   if(G.flags.huntJewels && G.jewels<4){ G.jewels++; const names=["Sapphire","Emerald","Ruby","Diamond"];
     say(["You find one of the four magic jewels — the "+names[G.jewels-1]+"! ("+G.jewels+"/4 jewels)"],"Treasure!"); return; }
-  const g=20+rnd(40)+G.lvl*5; G.gold+=g; const herb=chance(.5);
-  if(herb)addItem('Healing Herb',1);
-  say(["The chest holds "+g+" gold"+(herb?" and a Healing Herb.":".")],"Treasure!");
+  const g=20+rnd(40)+G.lvl*5; G.gold+=g;
+  const herb=chance(.5); if(herb)addItem('Healing Herb',1);
+  const gc=chance(.4); if(gc)addCoin('gold',1); // gold museum coins from dungeon depths
+  say(["The chest holds "+g+" gold"+(herb?", a Healing Herb":"")+(gc?", and a GOLD museum coin "+COIN_LABEL.gold:"")+"."],"Treasure!");
 }
 
 function takeSapphire(x,y){
   // guarded by a fierce bred beast, per the exhibit lore
-  startBattle(Object.assign({},MONSTERS[5],{n:"Pirate's Guard-Beast",hp:40,xp:60,gold:80}),()=>{
-    DUN.m[y][x]=30; sfx('win');
+  startBattle(Object.assign({},MONSTERS[10],{n:"Pirate's Guard-Beast",hp:70,gold:90}),()=>{
+    DUN.m[y][x]=30; sfx('win'); addCoin('gold',2);
     if(!hasItem('Sapphire')){ addItem('Sapphire',1); if(G.flags.huntJewels&&G.jewels<4)G.jewels++; }
-    say(["At the very bottom of the lair, behind the slain guardian, glitters the priceless SAPPHIRE — one of the four magic jewels! ("+G.jewels+"/4)"],"Treasure!");
+    say(["At the very bottom of the lair, behind the slain guardian, glitters the priceless SAPPHIRE — one of the four magic jewels! ("+G.jewels+"/4)  You also collect 2 gold museum coins."],"Treasure!");
   });
 }
 
 /* ===================== Town shops ===================== */
+function buy(cost){ if(G.gold>=cost){G.gold-=cost;sfx('coin');return true;} toast("Not enough gold"); return false; }
 function openShop(shop){
-  if(shop.k==='healer'){
+  // guards remember a robbery until you leave town
+  if(shop.k==='weapon'){
+    openMenu("Weaponsmith — equipped: "+G.weapon+" (dmg "+G.wdmg+")",
+      WEAPONS.filter(w=>w.cost>0).map(w=>({label:(G.weapon===w.n?'✔ ':'')+w.n,sub:'dmg '+w.dmg+' · '+w.cost+'g'})).concat([{label:"Some foes resist all but the right weapon",sub:''}]),
+      (it,i)=>{ const list=WEAPONS.filter(w=>w.cost>0); const w=list[i]; if(!w)return;
+        if(G.weapon===w.n){toast("Already equipped");return;}
+        if(buy(w.cost)){ setWeapon(w.n,w.dmg); addItem(w.n,1); toast(w.n+" equipped!"); } });
+  } else if(shop.k==='armor'){
+    openMenu("Armorer — worn: "+G.armor+" (def "+G.adef+")",
+      ARMORS.filter(a=>a.cost>0).map(a=>({label:(G.armor===a.n?'✔ ':'')+a.n,sub:'def '+a.def+' · '+a.cost+'g'})),
+      (it,i)=>{ const list=ARMORS.filter(a=>a.cost>0); const a=list[i]; if(!a)return;
+        if(G.armor===a.n){toast("Already worn");return;}
+        if(buy(a.cost)){ G.armor=a.n; G.adef=a.def; addItem(a.n,1); toast(a.n+" equipped!"); } });
+  } else if(shop.k==='magic'){
+    openMenu("Magic Shop — spells are cast until charges run out",
+      SPELLS.map(s=>({label:"Buy "+s.n+"  ✦"+(G.spells[s.n]||0),sub:s.d+' · '+s.cost+'g'})),
+      (it,i)=>{ const s=SPELLS[i]; if(s&&buy(s.cost)){ G.spells[s.n]=(G.spells[s.n]||0)+1; toast("+1 "+s.n+" charge"); } });
+  } else if(shop.k==='healer'){
     const cost=Math.max(5,(G.maxhp-G.hp)*2);
-    openMenu("Healer — "+ (G.hp<G.maxhp?("Restore HP for "+cost+" gold"):"You are at full health"),
-      [{label:"Heal fully",sub:cost+"g"},{label:"Buy Healing Herb",sub:"15g"},{label:"Buy climbing gear",sub:"40g"}],
-      (it,i)=>{ if(i===0){if(G.gold>=cost&&G.hp<G.maxhp){G.gold-=cost;G.hp=G.maxhp;sfx('heal');toast("Fully healed");}else toast("Cannot heal.");}
-        else if(i===1){if(G.gold>=15){G.gold-=15;addItem('Healing Herb');sfx('coin');toast("+1 Healing Herb");}else toast("Not enough gold");}
-        else if(i===2){if(G.gold>=40){G.gold-=40;addItem('Climbing Gear');sfx('coin');toast("Climbing gear acquired");}else toast("Not enough gold");} });
+    openMenu("Healer", [{label:"Heal fully",sub:cost+"g"},{label:"Buy Healing Herb",sub:"15g"},{label:"Buy Climbing Gear",sub:"40g"},{label:"Buy Rations (food)",sub:"12g"}],
+      (it,i)=>{ if(i===0){if(G.hp>=G.maxhp){toast("Already full");return;} if(buy(cost)){G.hp=G.maxhp;sfx('heal');toast("Fully healed");}}
+        else if(i===1){if(buy(15)){addItem('Healing Herb');toast("+1 Healing Herb");}}
+        else if(i===2){if(buy(40)){addItem('Climbing Gear');toast("Climbing gear acquired");}}
+        else if(i===3){if(buy(12)){addItem('Rations',3);toast("+3 Rations");}} });
   } else if(shop.k==='bank'){
-    openMenu("Lender & Bank",[{label:"Deposit 50 gold",sub:"safe from death"},{label:"Withdraw 50 gold"},{label:"Take a loan (+100g)",sub:"good rates"}],
-      (it,i)=>{ G.flags.bank=G.flags.bank||0;
-        if(i===0&&G.gold>=50){G.gold-=50;G.flags.bank+=50;toast("Deposited. Bank: "+G.flags.bank+"g");}
-        else if(i===1&&G.flags.bank>=50){G.flags.bank-=50;G.gold+=50;toast("Withdrew 50g");}
+    G.flags.bank=G.flags.bank||0;
+    openMenu("Lender & Bank — vault: "+G.flags.bank+"g",
+      [{label:"Deposit 50 gold",sub:"safe on death"},{label:"Withdraw 50 gold"},{label:"Take a loan (+100g)"},{label:"⚠ Rob the bank",sub:"risky!"}],
+      (it,i)=>{ if(i===0){if(G.gold>=50){G.gold-=50;G.flags.bank+=50;toast("Deposited");}else toast("Not enough gold");}
+        else if(i===1){if(G.flags.bank>=50){G.flags.bank-=50;G.gold+=50;toast("Withdrew 50g");}else toast("Vault too low");}
         else if(i===2){G.gold+=100;toast("Loan: +100 gold");}
-        else toast("Not enough funds."); });
+        else if(i===3){ robBank(); } });
   } else if(shop.k==='buyback'){
-    openMenu("Buyback Shop & Merchant",[{label:"Buy 1 Museum Coin",sub:"20g 🜚"},{label:"Buy 5 Museum Coins",sub:"90g 🜚"},{label:"Sell a Healing Herb",sub:"+8g"}],
-      (it,i)=>{ if(i===0){if(G.gold>=20){G.gold-=20;G.coins++;sfx('coin');toast("+1 coin");}else toast("Not enough gold");}
-        else if(i===1){if(G.gold>=90){G.gold-=90;G.coins+=5;sfx('coin');toast("+5 coins");}else toast("Not enough gold");}
-        else if(i===2){if(useItem('Healing Herb')){G.gold+=8;sfx('coin');toast("+8 gold");}else toast("No herbs to sell");} });
-  } else if(shop.k==='game'){
-    openMenu("Stones of Wisdom (gamble)",[{label:"Bet 10 gold",sub:"learn to lie..."},{label:"Bet 50 gold"}],
-      (it,i)=>{ const bet=i===0?10:50; if(G.gold<bet){toast("Not enough gold");return;}
-        const win=chance(0.4+G.intel*0.02); G.gold+= win?bet:-bet; sfx(win?'coin':'bad');
-        say([win?("You play flip-flop and WIN! +"+bet+" gold.") :("The stones fall against you. -"+bet+" gold.")],"Stones of Wisdom"); });
+    openMenu("Buyback Shop & Merchant",
+      [{label:"Buy bronze coin "+COIN_LABEL.bronze,sub:"20g"},{label:"Buy 5 bronze coins",sub:"90g"},
+       {label:"Buy silver coin "+COIN_LABEL.silver,sub:"75g"},{label:"Sell a Healing Herb",sub:"+8g"},{label:"Sell Meat",sub:"+5g"}],
+      (it,i)=>{ if(i===0){if(buy(20)){addCoin('bronze',1);toast("+1 bronze coin");}}
+        else if(i===1){if(buy(90)){addCoin('bronze',5);toast("+5 bronze coins");}}
+        else if(i===2){if(buy(75)){addCoin('silver',1);toast("+1 silver coin");}}
+        else if(i===3){if(useItem('Healing Herb')){G.gold+=8;sfx('coin');toast("+8 gold");}else toast("No herbs");}
+        else if(i===4){if(useItem('Meat')){G.gold+=5;sfx('coin');toast("+5 gold");}else toast("No meat");} });
+  } else if(shop.k==='arcade'){
+    openMenu("Arcade — win gold & permanently raise stats",
+      [{label:"Stadium Defender",sub:"block fireballs · +Endurance"},{label:"Blackjack",sub:"gamble for gold"},{label:"Flip-Flop",sub:"skill bet · +Dexterity"}],
+      (it,i)=>{ if(i===0)startStadium(); else if(i===1)startBlackjack(); else if(i===2)startFlipFlop(); });
   } else if(shop.k==='inn'){
-    openMenu("Inn",[{label:"Rest the night",sub:"10g — full heal"}],(it,i)=>{
-      if(G.gold>=10){G.gold-=10;G.hp=G.maxhp;sfx('heal');say(["You rest soundly and wake refreshed."],"Inn");}else toast("Not enough gold");});
+    openMenu("Inn",[{label:"Rest the night",sub:"10g — full heal & feed"}],(it,i)=>{
+      if(buy(10)){G.hp=G.maxhp;G.food=G.maxfood;sfx('heal');say(["You rest soundly and wake refreshed and fed."],"Inn");}});
   }
 }
+function robBank(){
+  const amt=80+rnd(120); G.gold+=amt; G.flags.bank=Math.max(0,(G.flags.bank||0));
+  if(currentTownId) G.guards[currentTownId]=true;
+  sfx('bad'); say(["You grab "+amt+" gold from the vault! The town guards of "+currentTownId+" will hunt you until you leave and return."],"Robbery!");
+}
 let hintIdx=0;
-function giveHint(){ const h=HINTS[hintIdx%HINTS.length];hintIdx++; G.hintsSeen++;
-  say([h],"Townsperson"); }
+function giveHint(){
+  // sometimes offer a mail-delivery quest
+  if(!G.mail && chance(0.5)){
+    const towns=LANDMARKS.filter(l=>l.tile===8 && l.id!==currentTownId_id);
+    if(towns.length){ const t=pick(towns);
+      G.mail={toId:t.id, toName:t.name, fromName:currentTownId, reward:100+rnd(60)};
+      say(["\"Courier! Carry this letter to "+t.name+" and you'll be paid about "+G.mail.reward+" gold on arrival.\""],"Townsperson"); return; }
+  }
+  const h=HINTS[hintIdx%HINTS.length];hintIdx++; G.hintsSeen++;
+  say([h],"Townsperson");
+}
+
+/* ===================== Mini-games ===================== */
+// --- Blackjack (menu driven) ---
+let BJ=null;
+function bjDraw(){ return 1+rnd(13); }
+function bjVal(cs){ let v=0,a=0; cs.forEach(c=>{ if(c>10)v+=10; else if(c===1){v+=11;a++;} else v+=c; }); while(v>21&&a){v-=10;a--;} return v; }
+function startBlackjack(){
+  openMenu("Blackjack — place your bet",[{label:"Bet 10g"},{label:"Bet 25g"},{label:"Bet 50g"},{label:"Leave"}],(it,i)=>{
+    if(i===3)return; const bet=[10,25,50][i]; if(G.gold<bet){toast("Not enough gold");return;}
+    G.gold-=bet; BJ={bet,p:[bjDraw(),bjDraw()],d:[bjDraw(),bjDraw()]}; bjTurn(); });
+}
+function bjTurn(){ const pv=bjVal(BJ.p); if(pv>=21){bjEnd();return;}
+  openMenu("Blackjack — your hand "+BJ.p.join(',')+" = "+pv+"  (dealer shows "+BJ.d[0]+")",
+    [{label:"Hit"},{label:"Stand"}],(it,i)=>{ if(i===0){BJ.p.push(bjDraw());bjTurn();} else bjEnd(); }); }
+function bjEnd(){ let pv=bjVal(BJ.p),dv=bjVal(BJ.d); while(dv<17){BJ.d.push(bjDraw());dv=bjVal(BJ.d);}
+  let win=0,msg;
+  if(pv>21)msg="Bust! You lose "+BJ.bet+"g.";
+  else if(dv>21||pv>dv){win=BJ.bet*2;msg="You win! +"+win+"g.";}
+  else if(pv===dv){win=BJ.bet;msg="Push — bet returned.";}
+  else msg="Dealer wins. You lose "+BJ.bet+"g.";
+  G.gold+=win; sfx(win>BJ.bet?'coin':'bad');
+  const p=BJ.p.join(','),d=BJ.d.join(','); BJ=null;
+  say(["Your "+p+" ("+pv+") vs dealer "+d+" ("+dv+"). "+msg],"Blackjack"); }
+// --- Flip-Flop (double-or-nothing skill streak) ---
+let FF=null;
+function startFlipFlop(){
+  openMenu("Flip-Flop — bet, call the flips, cash out anytime",[{label:"Bet 10g"},{label:"Bet 30g"},{label:"Leave"}],(it,i)=>{
+    if(i===2)return; const bet=[10,30][i]; if(G.gold<bet){toast("Not enough gold");return;}
+    G.gold-=bet; FF={pot:bet,streak:0}; ffRound(); });
+}
+function ffRound(){
+  openMenu("Flip-Flop — pot "+FF.pot+"g · streak "+FF.streak,
+    [{label:"Call FLIP"},{label:"Call FLOP"},{label:"Cash out (+"+FF.pot+"g)"}],(it,i)=>{
+      if(i===2){ const amt=FF.pot,s=FF.streak; G.gold+=amt; sfx('coin'); FF=null;
+        if(s>=4){G.dex+=1;toast("Dexterity +1!");} say(["You pocket "+amt+" gold."],"Flip-Flop"); return; }
+      if(chance(0.5+G.dex*0.01)){ FF.pot*=2; FF.streak++; sfx('coin'); ffRound(); }
+      else { sfx('bad'); FF=null; say(["Wrong call! The pot is lost."],"Flip-Flop"); } });
+}
+// --- Stadium Defender (real-time: turn to face & block incoming fireballs) ---
+let SD=null;
+function startStadium(){
+  G.scene_prevSD=G.scene; G.scene='stadium';
+  SD={lives:3, score:0, target:12, facing:0, balls:[], spawn:0, t:0}; // facing: 0=up,1=right,2=down,3=left
+  closeMenu(); sfx('open');
+  setHint("Turn to FACE each fireball to block it — use the D-pad / arrows. Reach "+SD.target+" blocks. B to quit.");
+}
+function sdUpdate(dt){
+  if(!SD) return;
+  SD.t+=dt; SD.spawn-=dt;
+  const speed=0.00022+SD.score*0.000018;
+  if(SD.spawn<=0){ SD.balls.push({dir:rnd(4),dist:1}); SD.spawn=Math.max(420,900-SD.score*35); }
+  for(let i=SD.balls.length-1;i>=0;i--){ const b=SD.balls[i]; b.dist-=speed*dt;
+    if(b.dist<=0){ SD.balls.splice(i,1);
+      if(SD.facing===b.dir){ SD.score++; sfx('hit'); if(SD.score>=SD.target){ sdEnd(true); return; } }
+      else { SD.lives--; sfx('hurt'); if(SD.lives<=0){ sdEnd(false); return; } } } }
+}
+function sdEnd(won){
+  const scene=G.scene_prevSD||'town';
+  if(won){ G.end+=2; G.maxhp+=6; G.hp=G.maxhp; G.gold+=60; sfx('lvl'); }
+  SD=null; G.scene=scene;
+  say([won?"You blocked them all! Endurance +2, max HP +6, +60 gold.":"A fireball got through. Better luck next time."],"Stadium Defender");
+}
+function sdRender(){
+  const g=ctx.createRadialGradient(W/2,H/2,20,W/2,H/2,Math.max(W,H)/1.4);
+  g.addColorStop(0,'#2a2030');g.addColorStop(1,'#0a0712'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  const cx=W/2, cy=H/2, R=Math.min(W,H)*0.42;
+  // arena ring
+  ctx.strokeStyle='#caa24a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.stroke();ctx.lineWidth=1;
+  // player facing
+  const ang=[-Math.PI/2,0,Math.PI/2,Math.PI][SD.facing];
+  ctx.fillStyle='#5cc6ff';ctx.beginPath();ctx.arc(cx,cy,14,0,7);ctx.fill();
+  ctx.fillStyle='#f4c860';ctx.beginPath();ctx.moveTo(cx+Math.cos(ang)*20,cy+Math.sin(ang)*20);
+  ctx.lineTo(cx+Math.cos(ang+2.4)*12,cy+Math.sin(ang+2.4)*12);ctx.lineTo(cx+Math.cos(ang-2.4)*12,cy+Math.sin(ang-2.4)*12);ctx.fill();
+  // fireballs
+  const dv=[[0,-1],[1,0],[0,1],[-1,0]];
+  for(const b of SD.balls){ const d=dv[b.dir]; const x=cx+d[0]*R*b.dist, y=cy+d[1]*R*b.dist;
+    ctx.fillStyle='#ff7a3a';ctx.beginPath();ctx.arc(x,y,9,0,7);ctx.fill();
+    ctx.fillStyle='#ffe08a';ctx.beginPath();ctx.arc(x,y,4,0,7);ctx.fill(); }
+  ctx.fillStyle='#e8edff';ctx.textAlign='center';ctx.font='bold 16px sans-serif';
+  ctx.fillText("Blocks "+SD.score+"/"+SD.target+"    Lives "+'❤'.repeat(Math.max(0,SD.lives)), W/2, 24);
+}
 
 /* ===================== BATTLE ===================== */
 let B=null;
 function startBattle(forced,onWin){
   const m=forced||monsterFor();
-  B={m, mhp:m.hp, onWin:onWin||null, log:"A "+m.n+" attacks!", turn:'player', def:false};
+  B={m, mhp:m.hp, onWin:onWin||null, log:"A "+m.n+" attacks!", turn:'player', def:false, stun:false, strBuff:0};
   sfx('bad'); setTrack('battle');
   G.scene_prev=G.scene; // remember
   openBattleMenu();
@@ -1025,39 +1314,61 @@ function startBattle(forced,onWin){
 function openBattleMenu(){
   if(!B)return;
   const weak=B.m.weak&&G.weapon===B.m.weak;
+  const charges=Object.values(G.spells||{}).reduce((a,b)=>a+b,0);
   openMenu("⚔ "+B.m.n+"   (HP "+Math.max(0,B.mhp)+")",
     [{label:"Attack with "+G.weapon, sub:weak?"effective!":""},
+     {label:"Cast Spell", sub:charges?charges+" charges":"none"},
      {label:"Use Healing Herb", sub:(G.inv['Healing Herb']||0)+" left"},
      {label:"Defend", sub:"reduce damage"},
      {label:"Flee", sub:""}],
     (it,i)=>battleAction(i));
 }
-function battleAction(i){
-  if(!B)return; B.def=false;
-  if(i===0){ // attack
-    let dmg=G.str+G.wdmg+rnd(5);
-    if(B.m.weak&&G.weapon===B.m.weak) dmg=Math.floor(dmg*1.8);
-    B.mhp-=dmg; sfx('hit');
-    B.log="You strike the "+B.m.n+" for "+dmg+(B.m.weak===G.weapon?" (super effective!)":"")+".";
-  } else if(i===1){
-    if(useItem('Healing Herb')){const h=15+G.intel;G.hp=clamp(G.hp+h,0,G.maxhp);sfx('heal');B.log="You eat a Healing Herb (+"+h+" HP).";}
-    else {B.log="No Healing Herbs left!";}
-  } else if(i===2){ B.def=true;B.log="You raise your guard."; }
-  else if(i===3){ if(chance(0.55)){ toast("You flee!"); B=null; afterBattle(false); return;} else B.log="You failed to flee!"; }
-  // check monster dead
+function enemyTurn(){
+  if(!B) return;
   if(B.mhp<=0){ winBattle(); return; }
-  // monster turn
-  let md=B.m.atk+rnd(4)-(B.def?Math.floor(B.m.atk*0.6):0);
+  if(B.stun){ B.stun=false; B.log+=" The "+B.m.n+" is befuddled and cannot act."; say([B.log],"Battle",()=>openBattleMenu()); return; }
+  let md=B.m.atk+rnd(4)-(B.def?Math.floor(B.m.atk*0.6):0)-(G.adef||0);
   md=Math.max(1,md); G.hp-=md; sfx('hurt');
   B.log+=" The "+B.m.n+" hits you for "+md+".";
   if(G.hp<=0){ G.hp=0; gameOver(); return; }
-  // show round, then reopen menu
   say([B.log],"Battle",()=>openBattleMenu());
 }
+function battleAction(i){
+  if(!B)return; B.def=false;
+  if(i===0){ let dmg=G.str+G.wdmg+rnd(5)+(B.strBuff||0);
+    if(B.m.weak&&G.weapon===B.m.weak) dmg=Math.floor(dmg*1.8);
+    B.mhp-=dmg; sfx('hit'); B.log="You strike the "+B.m.n+" for "+dmg+(B.m.weak===G.weapon?" (super effective!)":"")+"."; enemyTurn(); }
+  else if(i===1){ castMenu(); }
+  else if(i===2){ if(useItem('Healing Herb')){const h=15+G.intel;G.hp=clamp(G.hp+h,0,G.maxhp);sfx('heal');B.log="You eat a Healing Herb (+"+h+" HP).";}else B.log="No Healing Herbs left!"; enemyTurn(); }
+  else if(i===3){ B.def=true;B.log="You raise your guard."; enemyTurn(); }
+  else if(i===4){ if(chance(0.55)){ toast("You flee!"); B=null; afterBattle(false);} else { B.log="You failed to flee!"; enemyTurn(); } }
+}
+function castMenu(){
+  const avail=SPELLS.filter(s=>(G.spells[s.n]||0)>0);
+  if(!avail.length){ toast("No spell charges — buy some at a Magic Shop"); openBattleMenu(); return; }
+  openMenu("Cast which spell?",
+    avail.map(s=>({label:s.n+"  ✦"+G.spells[s.n],sub:s.d})).concat([{label:"← Back",sub:''}]),
+    (it,idx)=>{ if(idx>=avail.length){ openBattleMenu(); return; } doSpell(avail[idx].n); });
+}
+function doSpell(name){
+  if(!B) return;
+  G.spells[name]--; if(G.spells[name]<=0) delete G.spells[name];
+  sfx('hit');
+  if(name==='Blast'){ const d=12+G.intel+rnd(8); B.mhp-=d; B.log="Blast hits for "+d+"!"; enemyTurn(); }
+  else if(name==='Fireblast'){ const d=22+G.intel*2+rnd(10); B.mhp-=d; B.log="Fireblast sears for "+d+"!"; enemyTurn(); }
+  else if(name==='Befuddle'){ B.stun=true; B.log="You befuddle the "+B.m.n+"!"; enemyTurn(); }
+  else if(name==='Kill'){ if(B.m.hp<=40||chance(0.4)){ B.mhp=0; B.log="The Kill spell slays the "+B.m.n+"!"; winBattle(); } else { B.log="The "+B.m.n+" resists the Kill spell!"; enemyTurn(); } }
+  else if(name==='Strength'){ B.strBuff=(B.strBuff||0)+8; B.log="Psycho-strength surges (+8 attack)!"; enemyTurn(); }
+  else if(name==='Museum'){ toast("You warp to the Museum!"); B=null; setTrack('theme'); enterMuseum(); }
+}
 function winBattle(){
-  gainXP(B.m.xp); G.gold+=B.m.gold; sfx('win');
-  const cb=B.onWin; const name=B.m.n; const xp=B.m.xp,gold=B.m.gold; B=null;
-  say(["You defeated the "+name+"!  +"+xp+" XP, +"+gold+" gold."],"Victory",()=>{ if(cb)cb(); afterBattle(true); });
+  G.gold+=B.m.gold; sfx('win');
+  let extra="";
+  if(B.m.food){ addItem('Meat',1); extra+=", +1 meat"; }
+  if(B.m.coin && chance(0.5)){ addCoin(B.m.coin,1); extra+=", +1 "+B.m.coin+" coin"; }
+  else if(chance(0.22)){ addCoin('bronze',1); extra+=", +1 bronze coin"; }
+  const cb=B.onWin; const name=B.m.n; const gold=B.m.gold; B=null;
+  say(["You defeated the "+name+"!  +"+gold+" gold"+extra+"."],"Victory",()=>{ if(cb)cb(); afterBattle(true); });
 }
 function afterBattle(won){ setTrack(G.scene==='dungeon'?'theme':'theme'); }
 function gameOver(){
@@ -1092,11 +1403,22 @@ addEventListener('keydown',e=>{
     else if(k==='i'||k==='I')showInventory();
     else if(k==='m'||k==='M')showQuestLog();
     else if(k==='Escape')systemMenu();
-  } else if(G.scene==='town'||G.scene==='dungeon'){
+  } else if(G.scene==='town'){
     if(k==='ArrowUp')moveInterior(0,-1);else if(k==='ArrowDown')moveInterior(0,1);
     else if(k==='ArrowLeft')moveInterior(-1,0);else if(k==='ArrowRight')moveInterior(1,0);
-    else if(k==='Escape'){ if(G.scene==='town')backToOverworld(); else if(G.scene==='dungeon'){say(["You retreat to the surface."],"",()=>backToOverworld());} }
+    else if(k==='Escape')backToOverworld();
     else if(k==='i'||k==='I')showInventory();
+  } else if(G.scene==='fps'){
+    if(k==='ArrowUp'||k===' ')fpsForward(1);
+    else if(k==='ArrowDown')fpsForward(-1);
+    else if(k==='ArrowLeft')G.dir=(G.dir+3)%4;
+    else if(k==='ArrowRight')G.dir=(G.dir+1)%4;
+    else if(k==='Escape')say(["You retreat toward the surface."],"",()=>backToOverworld());
+    else if(k==='i'||k==='I')showInventory();
+  } else if(G.scene==='stadium'){
+    if(k==='ArrowUp')SD.facing=0; else if(k==='ArrowRight')SD.facing=1;
+    else if(k==='ArrowDown')SD.facing=2; else if(k==='ArrowLeft')SD.facing=3;
+    else if(k==='Escape'){ SD=null; G.scene=G.scene_prevSD||'town'; }
   } else if(G.scene==='museum'){
     const pads=museumPads(),cols=museumCols();
     if(k==='ArrowRight')P.mi=clamp(P.mi+1,0,pads.length-1);
@@ -1111,17 +1433,26 @@ addEventListener('keydown',e=>{
 });
 function showInventory(){
   const items=Object.keys(G.inv);
-  const list=items.length?items.map(n=>({label:n,sub:'×'+G.inv[n]})):[{label:"(empty)",sub:''}];
-  list.unshift({label:"— Weapon: "+G.weapon+" (dmg "+G.wdmg+")",sub:''});
-  list.unshift({label:"— STR "+G.str+"  CHA "+G.cha+"  INT "+G.intel,sub:''});
-  openMenu("Inventory & Stats",list,()=>{});
+  const FOOD={Rations:1,Meat:1,'Juton Fruit':1};
+  const list=[
+    {label:"STR "+G.str+" · END "+G.end+" · DEX "+G.dex+" · INT "+G.intel+" · CHA "+G.cha,sub:''},
+    {label:"Weapon: "+G.weapon+" (dmg "+G.wdmg+")   Armor: "+G.armor+" (def "+G.adef+")",sub:''},
+    {label:"Food: "+G.food+"/"+G.maxfood+"   Coins: "+COIN_LABEL.bronze+G.coins.bronze+" "+COIN_LABEL.silver+G.coins.silver+" "+COIN_LABEL.gold+G.coins.gold,sub:''},
+  ];
+  const spells=Object.keys(G.spells||{}).filter(s=>G.spells[s]>0);
+  if(spells.length) list.push({label:"Spells: "+spells.map(s=>s+"×"+G.spells[s]).join(', '),sub:''});
+  list.push({label:"— Items (tap food to eat) —",sub:''});
+  if(items.length) items.forEach(n=>list.push({label:(FOOD[n]?'🍴 ':'')+n,sub:'×'+G.inv[n],eat:!!FOOD[n],item:n}));
+  else list.push({label:"(no items)",sub:''});
+  openMenu("Inventory & Stats",list,(it)=>{ if(it&&it.eat){ eatFood(it.item); showInventory(); } });
 }
 function showQuestLog(){
   const stages=["Awaken in the Galactic Museum","Hear the Caretaker's plea","Recover the Crown & Scepter of Mancella",
     "Return the treasures","Receive the Magic Ice","Learn of the warlord","Hunt the 4 magic jewels","Return the jewels","Tarmalon is saved"];
   const cur=clamp(G.questStage,0,stages.length-1);
   const list=stages.map((s,i)=>({label:(i<G.questStage?'✓ ':(i===cur?'➤ ':'· '))+s,sub:''}));
-  list.push({label:"Jewels: "+G.jewels+"/4   ·   Museum coins: "+G.coins,sub:''});
+  list.push({label:"Jewels: "+G.jewels+"/4   ·   Coins "+COIN_LABEL.bronze+G.coins.bronze+" "+COIN_LABEL.silver+G.coins.silver+" "+COIN_LABEL.gold+G.coins.gold,sub:''});
+  if(G.mail) list.push({label:"✉ Deliver letter to "+G.mail.toName+" (+"+G.mail.reward+"g)",sub:''});
   list.push({label:"Tip: "+pick(HINTS),sub:''});
   openMenu("Quest — Neutralize the Wizards' Compendium",list,()=>{});
 }
@@ -1189,7 +1520,8 @@ function renderEnding(){
 /* ===================== Boot / loop ===================== */
 let last=0;
 function loop(ts){
-  const dt=ts-last; last=ts;
+  const dt=Math.min(64, ts-last); last=ts;
+  if(G&&G.scene==='stadium'&&!menuOpen&&!dlgOpen) sdUpdate(dt);
   if(!G||G.scene==='title') renderTitle();
   else if(G.scene==='ending') renderEnding();
   else render();
