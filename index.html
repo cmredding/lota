@@ -189,6 +189,8 @@ const CONTENT = {"museum": ["Eons ago, nomadic warriors roamed the planet Tarmal
 <script>
 "use strict";
 /* ===================== Canvas & helpers ===================== */
+const BUILD="v4 · full-screen mobile";
+try{ console.log("Legacy of the Ancients — build "+BUILD); }catch(e){}
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 let W=cv.width, H=cv.height;
 const TILE=24; let VIEW_W=Math.ceil(W/TILE), VIEW_H=Math.ceil((H-28)/TILE);
@@ -1205,7 +1207,7 @@ $('btnAbout').onclick=()=>{ if(!AC)musicStart(); say([
   "Every museum exhibit you read here is the ACTUAL text from the 1987 game data. The drifting map behind this title is the real decoded CASTLE map. The world, combat, shops and music are a faithful modern re-imagining of the original loop.",
   "Honesty note: the title-screen bitmap (TITLE.GLB/GMP) is RLE-compressed — the 'graphics wall' the kit itself flags as the part that required the now-retired Fable model. It did not crack cleanly on Opus alone, so this title uses verified-correct decoded data (the castle map) rather than a wrong guess.",
 ],"About");};
-$('titletag').innerHTML="Decoded from the original 1987 EA DOS files and rebuilt for the browser.<br>The museum exhibits you'll read — and the map drifting behind this title — are real decoded originals.";
+$('titletag').innerHTML="Decoded from the original 1987 EA DOS files and rebuilt for the browser.<br>The museum exhibits you'll read — and the map drifting behind this title — are real decoded originals.<br><span style='color:#5cc6ff;letter-spacing:.1em'>build "+BUILD+"</span>";
 
 addEventListener('keydown',e=>{ if(G&&G.scene==='ending'&&e.key===' '){G=null;refreshTitle();$('title').style.display='flex';} });
 addEventListener('keydown',e=>{ if((e.key==='p'||e.key==='P')&&!dlgOpen&&!menuOpen){ if(!AC)musicStart(); musicToggle(); } });
